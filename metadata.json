@@ -1,0 +1,7 @@
+{
+  "name": "Procura - Smart Procurement Application",
+  "description": "Smart procurement from request to payment with role-based workflows, smart vendor scoring, budget enforcement, purchase orders, delivery tracking, and audit trail.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

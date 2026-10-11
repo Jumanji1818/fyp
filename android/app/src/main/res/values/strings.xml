@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Procura</string>
+    <string name="title_activity_main">Procura</string>
+    <string name="package_name">ng.procura.app</string>
+    <string name="custom_url_scheme">ng.procura.app</string>
+</resources>
