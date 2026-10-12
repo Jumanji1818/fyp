@@ -51,6 +51,7 @@ interface AppContextType {
       email: string;
       approvalThreshold?: number;
       initialBudget?: number;
+      currency?: string;
     },
     adminData: {
       fullName: string;
@@ -523,6 +524,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       email: string;
       approvalThreshold?: number;
       initialBudget?: number;
+      currency?: string;
     },
     adminData: {
       fullName: string;
@@ -549,7 +551,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       phone: orgData.phone,
       email: orgData.email,
       approvalThreshold: threshold,
-      currency: '₦',
+      currency: orgData.currency || '₦',
       createdAt: new Date().toISOString(),
     };
 
