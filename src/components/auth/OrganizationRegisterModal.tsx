@@ -39,6 +39,19 @@ export const OrganizationRegisterModal: React.FC<OrganizationRegisterModalProps>
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [budgetEstimate, setBudgetEstimate] = useState<number>(15000000);
+  const [currency, setCurrency] = useState('NGN');
+
+  const CURRENCIES = [
+    { code: 'NGN', symbol: '₦', label: 'Nigerian Naira (₦)' },
+    { code: 'USD', symbol: '\( ', label: 'US Dollar ( \))' },
+    { code: 'GBP', symbol: '£', label: 'British Pound (£)' },
+    { code: 'EUR', symbol: '€', label: 'Euro (€)' },
+    { code: 'GHS', symbol: 'GH₵', label: 'Ghanaian Cedi (GH₵)' },
+    { code: 'KES', symbol: 'KSh', label: 'Kenyan Shilling (KSh)' },
+    { code: 'ZAR', symbol: 'R', label: 'South African Rand (R)' },
+    { code: 'CAD', symbol: 'C\( ', label: 'Canadian Dollar (C \))' },
+  ];
+  const selectedCurrency = CURRENCIES.find((c) => c.code === currency) || CURRENCIES[0];
 
   // Admin account details
   const [adminName, setAdminName] = useState('');
@@ -94,6 +107,7 @@ export const OrganizationRegisterModal: React.FC<OrganizationRegisterModalProps>
         email: email.trim(),
         approvalThreshold: threshold,
         initialBudget: budgetEstimate,
+        currency: selectedCurrency.symbol,
       },
       {
         fullName: adminName.trim(),
@@ -320,10 +334,24 @@ export const OrganizationRegisterModal: React.FC<OrganizationRegisterModalProps>
                   <MapPin className="w-4 h-4 text-[#A8B5AB] absolute left-3 top-2.5" />
                 </div>
               </div>
+              <div>
+                <label className="block text-[#A8B5AB] font-medium mb-1">
+                  Operating Currency *
+                </label>
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-[#07130E] border border-[#1F3A2D] text-[#F2EFE6] focus:border-[#D4AF37] outline-none font-semibold"
+                >
+                  {CURRENCIES.map((c) => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
 
               <div className="md:col-span-2">
                 <label className="block text-[#A8B5AB] font-medium mb-1">
-                  Estimated Initial Annual Purchasing Budget (₦)
+                  Estimated Initial Annual Purchasing Budget ({selectedCurrency.symbol})
                 </label>
                 <div className="relative">
                   <input
@@ -336,7 +364,7 @@ export const OrganizationRegisterModal: React.FC<OrganizationRegisterModalProps>
                   <DollarSign className="w-4 h-4 text-[#A8B5AB] absolute left-3 top-2.5" />
                 </div>
                 <span className="text-[11px] text-[#D4AF37] mt-1 block">
-                  Formatted Cap: ₦{budgetEstimate.toLocaleString()}
+                  Formatted Cap: {selectedCurrency.symbol}{budgetEstimate.toLocaleString()}
                 </span>
               </div>
             </div>
