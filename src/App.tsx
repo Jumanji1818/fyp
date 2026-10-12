@@ -6,6 +6,7 @@ import { StillThereModal } from './components/shell/StillThereModal';
 import { CelebrationModal } from './components/common/CelebrationModal';
 import { SplashScreen } from './components/launch/SplashScreen';
 import { WelcomeWizard } from './components/launch/WelcomeWizard';
+import { OrganizationSetupPage } from './components/launch/OrganizationSetupPage';
 import { SignInScreen } from './components/auth/SignInScreen';
 import { OrganizationRegisterModal } from './components/auth/OrganizationRegisterModal';
 import { MustChangePasswordModal } from './components/auth/MustChangePasswordModal';
@@ -48,7 +49,7 @@ const MainApp: React.FC = () => {
   const [showSplash, setShowSplash] = useState(() => {
     return !sessionStorage.getItem('procura_splash_done');
   });
-  const [authView, setAuthView] = useState<'signin' | 'welcome'>('welcome');
+  const [authView, setAuthView] = useState<'signin' | 'welcome' | 'org_setup'>('welcome');
 
   // Modals for auth & features
   const [orgRegisterOpen, setOrgRegisterOpen] = useState(false);
@@ -130,12 +131,18 @@ const MainApp: React.FC = () => {
       )}
 
       {/* Main Flow */}
-      {!isAuthenticated ? (
+   {!isAuthenticated ? (
         authView === 'welcome' ? (
           <WelcomeWizard
             onGoToSignIn={() => setAuthView('signin')}
             onGoToVendorRegister={() => setVendorRegisterOpen(true)}
             onFinishSetup={() => setAuthView('signin')}
+            onSetupOrganization={() => setAuthView('org_setup')}
+          />
+        ) : authView === 'org_setup' ? (
+          <OrganizationSetupPage
+            onBack={() => setAuthView('welcome')}
+            onComplete={() => setAuthView('signin')}
           />
         ) : (
           <SignInScreen
