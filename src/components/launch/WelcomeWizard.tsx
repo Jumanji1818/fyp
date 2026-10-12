@@ -22,12 +22,14 @@ interface WelcomeWizardProps {
   onGoToSignIn: () => void;
   onGoToVendorRegister: () => void;
   onFinishSetup: () => void;
+  onSetupOrganization: () => void;
 }
 
 export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
   onGoToSignIn,
   onGoToVendorRegister,
   onFinishSetup,
+  onSetupOrganization,
 }) => {
   const { loadDemoData, updateSettings } = useApp();
   const [step, setStep] = useState<'welcome' | 1 | 2 | 3 | 'done'>('welcome');
@@ -156,7 +158,7 @@ export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
         {/* Footer info */}
         <div className="relative z-10 text-xs text-[#A8B5AB]/70 flex items-center justify-between">
           <span>Procura Enterprise · Version 2026.1</span>
-          <span>Currency: Nigerian Naira (₦)</span>
+          <span>Multi-currency · Role-based workflows</span>
         </div>
       </div>
 
@@ -175,7 +177,7 @@ export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
 
               <div className="space-y-3 pt-2">
                 <button
-                  onClick={() => setStep(1)}
+                  onClick={onSetupOrganization}
                   className="w-full py-3 px-4 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] font-semibold text-sm hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg"
                 >
                   <Building className="w-4 h-4 text-[#D4AF37]" />
