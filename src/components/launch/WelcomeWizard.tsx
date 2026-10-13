@@ -99,11 +99,11 @@ export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
 
         {/* Top Header */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37] flex items-center justify-center text-[#D4AF37] shadow-lg">
-            <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current">
-              <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm-1.2 14.5l-3.8-3.8 1.4-1.4 2.4 2.4 5.4-5.4 1.4 1.4-6.8 6.8z" />
-            </svg>
-          </div>
+          <img
+            src="/1791779045601.jpg"
+            alt="Procura"
+            className="w-10 h-10 rounded-xl object-cover border border-[#D4AF37] shadow-lg"
+          />
           <div>
             <h2 className="text-xl font-bold font-serif-heading text-[#D4AF37] tracking-wider">PROCURA</h2>
             <p className="text-xs text-[#A8B5AB]">Smart procurement, from request to payment</p>
