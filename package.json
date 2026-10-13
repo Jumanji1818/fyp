@@ -60,27 +60,21 @@
     ],
     "win": {
       "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
       ],
-      "icon": "public/icon-square.png"
+      "icon": "public/icon-square.png",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "Procura-Setup-${version}.${ext}"
     },
-    "artifactName": "Procura-${version}-${target}.${ext}"
+    "portable": {
+      "artifactName": "Procura-Portable-${version}.${ext}"
+    }
   }
 }
