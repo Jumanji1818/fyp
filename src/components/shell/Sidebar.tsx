@@ -115,10 +115,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
       ];
     }
 
+    // Sole Proprietorship (Solo Operator): Clean, focused workflow
+    if (currentOrganization.type === 'sole_proprietorship') {
+      return [
+        { id: 'dashboard', label: 'Owner Overview', icon: LayoutDashboard },
+        { id: 'requests', label: 'Purchase Requests', icon: FileText },
+        { id: 'approvals', label: 'Pending Approvals Queue', icon: CheckSquare },
+        { id: 'tenders', label: 'Sourcing & RFQ', icon: ShoppingBag },
+        { id: 'evaluation', label: 'Vendor Quotes & Scoring', icon: Scale },
+        { id: 'orders', label: 'Purchase Orders (PO)', icon: Truck },
+        { id: 'deliveries', label: 'Store Receiving & GRN', icon: PackageCheck },
+        { id: 'payments', label: 'Payment Disbursements', icon: CreditCard },
+        { id: 'vendors', label: 'Vendor Directory', icon: Building },
+        { id: 'budgets', label: 'Operating Budgets', icon: PieChart },
+        { id: 'reports', label: 'Reports & Analytics', icon: BarChart3 },
+        { id: 'audit', label: 'Audit Log (Immutable)', icon: ShieldAlert },
+        { id: 'settings', label: 'Business Settings', icon: SettingsIcon },
+      ];
+    }
+
     // Organization Admin: Full Governance & Operations Overview
     return [
       { id: 'dashboard', label: 'Admin Command Center', icon: LayoutDashboard },
       { id: 'requests', label: 'All Purchase Requests', icon: FileText },
+      { id: 'approvals', label: 'Pending Dept Approvals', icon: CheckSquare },
       { id: 'tenders', label: 'Tenders Management', icon: ShoppingBag },
       { id: 'evaluation', label: 'Bids & Scoring (Overview)', icon: Scale },
       { id: 'orders', label: 'Purchase Orders Ledger', icon: Truck },

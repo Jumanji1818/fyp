@@ -351,6 +351,7 @@ export const INITIAL_USERS: User[] = [
     email: 'hussain@husabdesign.ng',
     phone: '+234 802 443 3221',
     role: 'Organization Admin',
+    departmentId: 'dept-husab-prod',
     status: 'Active',
     avatar: 'HA',
     securityQuestion: 'What is your specialty trade?',

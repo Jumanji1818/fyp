@@ -34,13 +34,17 @@ export const DepartmentApprovalsModule: React.FC = () => {
   const [commentText, setCommentText] = useState('');
   const [reasonText, setReasonText] = useState('');
 
-  // Department Head reviews requests from their department only (Section 4 & 6.2)
+  const isSole = currentOrganization.type === 'sole_proprietorship';
+  const isAdmin = currentUser?.role === 'Organization Admin';
+  const approverRole = isSole ? 'Business Owner' : isAdmin ? 'Organization Admin' : 'Department Head';
+
+  // Department Head reviews requests from their department only, while Admins & Sole Proprietors review all org requisitions
   const deptRequests = requests.filter((r) => {
     const matchOrg = r.organizationId
       ? r.organizationId === currentOrganization.id
       : currentOrganization.id === 'org-emerald';
     if (!matchOrg) return false;
-    if (currentUser?.departmentId && r.departmentId !== currentUser.departmentId) return false;
+    if (!isAdmin && !isSole && currentUser?.departmentId && r.departmentId !== currentUser.departmentId) return false;
     return r.status === 'Submitted';
   });
 
@@ -53,7 +57,7 @@ export const DepartmentApprovalsModule: React.FC = () => {
     : 0;
 
   const handleApprove = (req: PurchaseRequest) => {
-    approveRequest(req.id, 'Approved by Department Head. Budget verified.');
+    approveRequest(req.id, `Approved by ${approverRole}. Budget verified.`);
     setActiveReq(null);
   };
 
@@ -79,10 +83,16 @@ export const DepartmentApprovalsModule: React.FC = () => {
       <div className="p-6 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D] flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold font-serif-heading text-[#F2EFE6]">
-            Department Requisition Approvals
+            {isSole
+              ? 'Owner Requisition Approvals Queue'
+              : isAdmin
+              ? 'Corporate Requisition Approvals Queue'
+              : 'Department Requisition Approvals'}
           </h2>
           <p className="text-xs text-[#A8B5AB] mt-0.5">
-            Operating Unit: <strong className="text-[#D4AF37]">{targetDept?.name || 'Department'}</strong> · Inbox of pending staff purchase requests.
+            {isSole
+              ? 'Direct sign-off portal: Authorize pending requisitions for immediate vendor tender sourcing.'
+              : `Operating Unit: ${targetDept?.name || 'Department'} · Inbox of pending purchase requests.`}
           </p>
         </div>
 

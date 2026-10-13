@@ -22,9 +22,10 @@ import { PurchaseRequest, RequestItem, RequestStatus } from '../../types';
 
 interface RequestsModuleProps {
   initialSelectedId?: string;
+  onNavigateTab?: (tabId: string, itemId?: string) => void;
 }
 
-export const RequestsModule: React.FC<RequestsModuleProps> = ({ initialSelectedId }) => {
+export const RequestsModule: React.FC<RequestsModuleProps> = ({ initialSelectedId, onNavigateTab }) => {
   const {
     requests,
     departments,
@@ -33,6 +34,9 @@ export const RequestsModule: React.FC<RequestsModuleProps> = ({ initialSelectedI
     currentOrganization,
     createRequest,
     updateRequest,
+    approveRequest,
+    returnRequest,
+    rejectRequest,
   } = useApp();
 
   const orgDepts = departments.filter((d) =>
@@ -49,6 +53,24 @@ export const RequestsModule: React.FC<RequestsModuleProps> = ({ initialSelectedI
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [newModalOpen, setNewModalOpen] = useState<boolean>(false);
+
+  // Return and Reject modal states
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [actionReq, setActionReq] = useState<PurchaseRequest | null>(null);
+  const [returnComment, setReturnComment] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
+
+  const isSole = currentOrganization.type === 'sole_proprietorship';
+  const isAdmin = currentUser?.role === 'Organization Admin';
+  const isDeptHead = currentUser?.role === 'Department Head';
+
+  const canApprove = (req?: PurchaseRequest | null) => {
+    if (!req) return false;
+    if (isSole || isAdmin) return true;
+    if (isDeptHead && currentUser?.departmentId && req.departmentId === currentUser.departmentId) return true;
+    return false;
+  };
 
   // New Request Form State
   const [title, setTitle] = useState('');
@@ -317,15 +339,46 @@ export const RequestsModule: React.FC<RequestsModuleProps> = ({ initialSelectedI
                     </td>
                     <td className="py-3 px-4 text-[#A8B5AB]">{req.neededByDate}</td>
                     <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedReq(req);
-                        }}
-                        className="p-1 rounded hover:bg-[#1F3A2D] text-[#D4AF37]"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {req.status === 'Submitted' && canApprove(req) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              approveRequest(
+                                req.id,
+                                isSole ? 'Self-approved by Business Owner' : 'Directly approved by Administrator'
+                              );
+                            }}
+                            title="Approve Requisition"
+                            className="px-2 py-1 rounded-lg bg-[#3FB67A]/20 hover:bg-[#3FB67A]/30 text-[#3FB67A] border border-[#3FB67A]/40 font-medium text-[11px] flex items-center gap-1 transition-all"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            <span>Approve</span>
+                          </button>
+                        )}
+                        {req.status === 'Approved by Department' && onNavigateTab && (isAdmin || isSole || currentUser?.role === 'Procurement Officer') && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onNavigateTab('tenders', req.id);
+                            }}
+                            title="Convert to Tender"
+                            className="px-2 py-1 rounded-lg bg-[#1F6F4A]/30 hover:bg-[#1F6F4A]/50 text-[#D4AF37] border border-[#D4AF37]/40 font-medium text-[11px] flex items-center gap-1 transition-all"
+                          >
+                            <span>Tender →</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedReq(req);
+                          }}
+                          className="p-1 rounded hover:bg-[#1F3A2D] text-[#D4AF37]"
+                          title="View Details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -549,21 +602,38 @@ export const RequestsModule: React.FC<RequestsModuleProps> = ({ initialSelectedI
             </div>
           </div>
 
+          {/* Direct Approval Banner for Sole Proprietors and Admins */}
+          {(isSole || isAdmin) && (
+            <div className="p-3 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-start gap-2.5 text-xs text-[#E8CF7A]">
+              <Sparkles className="w-4 h-4 text-[#D4AF37] shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-[#F2EFE6] block">
+                  {isSole ? 'Sole Proprietorship Direct Authorization' : 'Administrator Master Authorization'}
+                </span>
+                <span className="text-[11px] text-[#A8B5AB]">
+                  {isSole
+                    ? 'As the business owner of a sole proprietorship, you have direct purchasing authority. You can self-approve this requisition immediately to proceed straight to vendor sourcing or quotation.'
+                    : 'As Organization Administrator, you can directly authorize this requisition to skip departmental queues.'}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Modal Actions */}
-          <div className="flex items-center justify-between pt-2 border-t border-[#1F3A2D]">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-[#1F3A2D]">
             <button
               type="button"
               onClick={() => setNewModalOpen(false)}
-              className="px-4 py-2 rounded-[10px] border border-[#1F3A2D] text-[#A8B5AB]"
+              className="px-4 py-2 rounded-[10px] border border-[#1F3A2D] text-[#A8B5AB] w-full sm:w-auto"
             >
               Cancel
             </button>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
               <button
                 type="button"
                 onClick={() => handleSave('Draft')}
-                className="px-4 py-2 rounded-[10px] bg-[#132A20] text-[#E8CF7A] font-semibold hover:bg-[#1F3A2D]"
+                className="px-3.5 py-2 rounded-[10px] bg-[#132A20] text-[#E8CF7A] font-semibold hover:bg-[#1F3A2D] text-xs"
               >
                 Save as Draft
               </button>
@@ -571,10 +641,21 @@ export const RequestsModule: React.FC<RequestsModuleProps> = ({ initialSelectedI
                 type="button"
                 onClick={() => handleSave('Submitted')}
                 disabled={!title.trim() || grandTotal <= 0}
-                className="px-6 py-2 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] font-semibold hover:brightness-110 shadow-lg disabled:opacity-40"
+                className="px-4 py-2 rounded-[10px] bg-[#132A20] text-[#A8B5AB] font-semibold hover:text-[#F2EFE6] hover:bg-[#1F3A2D] border border-[#1F3A2D] text-xs disabled:opacity-40"
               >
-                Submit Requisition
+                Submit for Review
               </button>
+              {(isSole || isAdmin) && (
+                <button
+                  type="button"
+                  onClick={() => handleSave('Approved by Department')}
+                  disabled={!title.trim() || grandTotal <= 0}
+                  className="px-5 py-2 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] font-semibold hover:brightness-110 shadow-lg text-xs flex items-center gap-1.5 disabled:opacity-40"
+                >
+                  <CheckCircle className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>Submit & Self-Approve</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -603,7 +684,86 @@ export const RequestsModule: React.FC<RequestsModuleProps> = ({ initialSelectedI
               }
             />
 
-            {/* Returned for Correction Note (Section 6.1: "shows reviewer's comment in a gold-bordered note") */}
+            {/* Approval Decision Controls for Submitted Requisitions */}
+            {selectedReq.status === 'Submitted' && canApprove(selectedReq) && (
+              <div className="p-4 rounded-xl bg-[#0D1F17] border-2 border-[#3FB67A]/40 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-lg animate-in fade-in">
+                <div>
+                  <span className="font-bold text-[#F2EFE6] text-xs flex items-center gap-1.5">
+                    <CheckCircle className="w-4 h-4 text-[#3FB67A]" /> Pending Authorization Decision
+                  </span>
+                  <span className="text-[11px] text-[#A8B5AB] block mt-0.5">
+                    {isSole
+                      ? 'You are the registered business owner. Authorize this purchase request to unlock vendor tender sourcing.'
+                      : 'You have administrative / departmental authorization authority over this requisition.'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => {
+                      setActionReq(selectedReq);
+                      setReturnComment('');
+                      setReturnModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 rounded-lg border border-[#E0A93B]/40 text-[#E0A93B] hover:bg-[#E0A93B]/10 font-semibold text-xs"
+                  >
+                    Return for Correction
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActionReq(selectedReq);
+                      setRejectReason('');
+                      setRejectModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 rounded-lg border border-[#D9534F]/40 text-[#D9534F] hover:bg-[#D9534F]/10 font-semibold text-xs"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    onClick={() => {
+                      const note = isSole ? 'Self-approved by Business Owner' : 'Directly approved by Administrator';
+                      approveRequest(selectedReq.id, note);
+                      setSelectedReq({
+                        ...selectedReq,
+                        status: 'Approved by Department',
+                        reviewerName: currentUser?.fullName || (isSole ? 'Business Owner' : 'Administrator'),
+                        reviewComment: note,
+                      });
+                    }}
+                    className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/60 text-[#F2EFE6] hover:brightness-110 font-semibold text-xs flex items-center gap-1.5 shadow-md"
+                  >
+                    <CheckCircle className="w-4 h-4 text-[#D4AF37]" />
+                    <span>Approve Requisition</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Approved notification with shortcut to Sourcing / Tenders */}
+            {selectedReq.status === 'Approved by Department' && (
+              <div className="p-3.5 rounded-xl bg-[#132A20] border border-[#3FB67A]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-[#3FB67A] shrink-0" />
+                  <span className="text-xs text-[#F2EFE6] font-medium">
+                    This requisition is approved and ready to be converted into a tender or quote request!
+                  </span>
+                </div>
+                {onNavigateTab && (isAdmin || isSole || currentUser?.role === 'Procurement Officer') && (
+                  <button
+                    onClick={() => {
+                      const tId = selectedReq.id;
+                      setSelectedReq(null);
+                      onNavigateTab('tenders', tId);
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] text-xs font-semibold hover:brightness-110 flex items-center gap-1 shrink-0"
+                  >
+                    <span>Proceed to Tender Sourcing</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Returned for Correction Note */}
             {selectedReq.status === 'Returned for Correction' && (
               <div className="p-4 rounded-xl bg-[#07130E] border-2 border-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.2)] space-y-2">
                 <div className="flex items-center justify-between text-[#D4AF37] font-bold">
@@ -707,6 +867,118 @@ export const RequestsModule: React.FC<RequestsModuleProps> = ({ initialSelectedI
           </div>
         </Modal>
       )}
+
+      {/* Return for Correction Modal */}
+      <Modal
+        isOpen={returnModalOpen}
+        onClose={() => {
+          setReturnModalOpen(false);
+          setActionReq(null);
+        }}
+        title={`Return Requisition: ${actionReq?.referenceNumber}`}
+        subtitle="Provide required adjustments for requester"
+      >
+        <div className="space-y-4 text-xs">
+          <div>
+            <label className="block text-[#A8B5AB] font-medium mb-1">
+              Correction Instructions *
+            </label>
+            <textarea
+              rows={4}
+              value={returnComment}
+              onChange={(e) => setReturnComment(e.target.value)}
+              placeholder="e.g. Please update quantity or attach preliminary pro-forma invoice."
+              className="w-full p-3 rounded-xl bg-[#132A20] border border-[#1F3A2D] text-[#F2EFE6] outline-none focus:border-[#D4AF37]"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t border-[#1F3A2D]">
+            <button
+              onClick={() => {
+                setReturnModalOpen(false);
+                setActionReq(null);
+              }}
+              className="px-4 py-2 rounded-lg border border-[#1F3A2D] text-[#A8B5AB]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                if (!actionReq || !returnComment.trim()) return;
+                returnRequest(actionReq.id, returnComment.trim());
+                if (selectedReq?.id === actionReq.id) {
+                  setSelectedReq({
+                    ...selectedReq,
+                    status: 'Returned for Correction',
+                    reviewComment: returnComment.trim(),
+                  });
+                }
+                setReturnModalOpen(false);
+                setActionReq(null);
+              }}
+              disabled={!returnComment.trim()}
+              className="px-4 py-2 rounded-lg bg-[#E0A93B] text-black font-semibold disabled:opacity-40"
+            >
+              Confirm Return
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Reject Modal */}
+      <Modal
+        isOpen={rejectModalOpen}
+        onClose={() => {
+          setRejectModalOpen(false);
+          setActionReq(null);
+        }}
+        title={`Reject Requisition: ${actionReq?.referenceNumber}`}
+        subtitle="Formal justification required"
+      >
+        <div className="space-y-4 text-xs">
+          <div>
+            <label className="block text-[#A8B5AB] font-medium mb-1">
+              Rejection Reason *
+            </label>
+            <textarea
+              rows={4}
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="e.g. Deprecated initiative or budget variance policy limit reached."
+              className="w-full p-3 rounded-xl bg-[#132A20] border border-[#1F3A2D] text-[#F2EFE6] outline-none focus:border-[#D9534F]"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t border-[#1F3A2D]">
+            <button
+              onClick={() => {
+                setRejectModalOpen(false);
+                setActionReq(null);
+              }}
+              className="px-4 py-2 rounded-lg border border-[#1F3A2D] text-[#A8B5AB]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                if (!actionReq || !rejectReason.trim()) return;
+                rejectRequest(actionReq.id, rejectReason.trim());
+                if (selectedReq?.id === actionReq.id) {
+                  setSelectedReq({
+                    ...selectedReq,
+                    status: 'Rejected',
+                    reviewComment: rejectReason.trim(),
+                  });
+                }
+                setRejectModalOpen(false);
+                setActionReq(null);
+              }}
+              disabled={!rejectReason.trim()}
+              className="px-4 py-2 rounded-lg bg-[#D9534F] text-white font-semibold disabled:opacity-40"
+            >
+              Confirm Rejection
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

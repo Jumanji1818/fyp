@@ -195,7 +195,12 @@ const MainApp: React.FC = () => {
                   />
                 )}
 
-                {currentTab === 'requests' && <RequestsModule initialSelectedId={navItemId} />}
+                {currentTab === 'requests' && (
+                  <RequestsModule
+                    initialSelectedId={navItemId}
+                    onNavigateTab={handleNavigate}
+                  />
+                )}
 
                 {currentTab === 'approvals' && <DepartmentApprovalsModule />}
 

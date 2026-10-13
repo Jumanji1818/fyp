@@ -825,17 +825,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Request Workflows
   const createRequest = (data: Partial<PurchaseRequest>): PurchaseRequest => {
-    const count = requests.length + 1;
-    const ref = `REQ-2026-${count.toString().padStart(4, '0')}`;
+    const isSole = currentOrganization.type === 'sole_proprietorship';
+    const orgPrefix =
+      currentOrganization.id === 'org-husab'
+        ? 'REQ-HUSB'
+        : currentOrganization.id === 'org-nnpc'
+        ? 'REQ-NNPC'
+        : 'REQ-2026';
+
+    const count =
+      requests.filter((r) =>
+        r.organizationId ? r.organizationId === currentOrganization.id : currentOrganization.id === 'org-emerald'
+      ).length + 1;
+    const ref = `${orgPrefix}-${count.toString().padStart(4, '0')}`;
+
+    const orgDepts = departments.filter((d) =>
+      d.organizationId ? d.organizationId === currentOrganization.id : currentOrganization.id === 'org-emerald'
+    );
+    const assignedDeptId = data.departmentId || currentUser?.departmentId || orgDepts[0]?.id || 'dept-works';
+    const assignedDept = departments.find((d) => d.id === assignedDeptId) || orgDepts[0];
+
+    // Determine initial status: If explicitly supplied, use it; for sole proprietors, if not draft, default to direct approval
+    const finalStatus: RequestStatus = data.status
+      ? data.status
+      : isSole
+      ? 'Approved by Department'
+      : 'Submitted';
+
+    const isApproved = finalStatus === 'Approved by Department';
+
     const newReq: PurchaseRequest = {
       id: 'req-' + Date.now(),
       organizationId: currentOrganization.id,
       referenceNumber: ref,
       title: data.title || 'Untitled Request',
-      departmentId: data.departmentId || currentUser?.departmentId || 'dept-works',
-      departmentName:
-        departments.find((d) => d.id === (data.departmentId || currentUser?.departmentId))?.name ||
-        'Works & Infrastructure',
+      departmentId: assignedDeptId,
+      departmentName: assignedDept?.name || 'Operations',
       requesterId: currentUser?.id || 'unknown',
       requesterName: currentUser?.fullName || 'Requester',
       priority: data.priority || 'Normal',
@@ -843,23 +868,74 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       justification: data.justification || '',
       items: data.items || [],
       estimatedTotal: (data.items || []).reduce((acc, it) => acc + it.totalPrice, 0),
-      status: data.status || 'Submitted',
+      status: finalStatus,
+      reviewerId: isApproved ? currentUser?.id : undefined,
+      reviewerName: isApproved ? currentUser?.fullName || (isSole ? 'Business Owner' : 'Administrator') : undefined,
+      reviewComment: isApproved
+        ? isSole
+          ? 'Directly self-approved by Sole Proprietor / Business Owner'
+          : 'Directly approved by Organization Administrator'
+        : undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     setRequests((prev) => [newReq, ...prev]);
-    addAuditLog('Created Purchase Request', ref, undefined, `Status: ${newReq.status}`, `Estimated total: ₦${newReq.estimatedTotal.toLocaleString()}`);
 
-    if (newReq.status === 'Submitted') {
+    if (isApproved) {
+      addAuditLog(
+        isSole ? 'Requisition Self-Approved' : 'Requisition Directly Authorized',
+        ref,
+        undefined,
+        'Approved by Department',
+        `Authorized by ${newReq.reviewerName}. Estimated total: ₦${newReq.estimatedTotal.toLocaleString()}`
+      );
       addNotification({
-        forRole: 'Department Head',
-        title: 'New Purchase Request Submitted',
-        message: `${newReq.requesterName} submitted ${ref} (${newReq.title}).`,
+        userId: newReq.requesterId,
+        title: isSole ? 'Requisition Self-Approved' : 'Requisition Approved',
+        message: `${ref} is authorized and ready for tender conversion or purchase order generation.`,
+        type: 'success',
+        recordType: 'request',
+        recordId: newReq.id,
+      });
+      addNotification({
+        forRole: 'Procurement Officer',
+        title: 'Approved Requisition in Queue',
+        message: `Requisition ${ref} (${newReq.title}) is ready for tender conversion.`,
         type: 'info',
         recordType: 'request',
         recordId: newReq.id,
       });
+    } else {
+      addAuditLog(
+        'Created Purchase Request',
+        ref,
+        undefined,
+        `Status: ${newReq.status}`,
+        `Estimated total: ₦${newReq.estimatedTotal.toLocaleString()}`
+      );
+
+      if (newReq.status === 'Submitted') {
+        if (isSole) {
+          addNotification({
+            userId: currentUser?.id,
+            title: 'New Requisition Awaiting Sign-Off',
+            message: `Your requisition ${ref} is saved and awaiting your approval sign-off.`,
+            type: 'info',
+            recordType: 'request',
+            recordId: newReq.id,
+          });
+        } else {
+          addNotification({
+            forRole: 'Department Head',
+            title: 'New Purchase Request Submitted',
+            message: `${newReq.requesterName} submitted ${ref} (${newReq.title}).`,
+            type: 'info',
+            recordType: 'request',
+            recordId: newReq.id,
+          });
+        }
+      }
     }
 
     return newReq;
@@ -879,13 +955,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const approveRequest = (id: string, reviewerComment?: string) => {
+    const isSole = currentOrganization.type === 'sole_proprietorship';
+    const isAdmin = currentUser?.role === 'Organization Admin';
+    const approverTitle = isSole
+      ? 'Business Owner'
+      : isAdmin
+      ? 'Organization Admin'
+      : 'Department Head';
+
     setRequests((prev) =>
       prev.map((r) => {
         if (r.id === id) {
-          addAuditLog('Department Approval Granted', r.referenceNumber, r.status, 'Approved by Department', reviewerComment || 'Approved');
+          addAuditLog(
+            `${approverTitle} Approval Granted`,
+            r.referenceNumber,
+            r.status,
+            'Approved by Department',
+            reviewerComment || `Approved by ${approverTitle}`
+          );
           addNotification({
             userId: r.requesterId,
-            title: 'Request Approved by Department Head',
+            title: `Request Approved by ${approverTitle}`,
             message: `Your request ${r.referenceNumber} has been approved and moved to Procurement.`,
             type: 'success',
             recordType: 'request',
@@ -903,8 +993,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             ...r,
             status: 'Approved by Department',
             reviewerId: currentUser?.id,
-            reviewerName: currentUser?.fullName,
-            reviewComment: reviewerComment || 'Approved',
+            reviewerName: currentUser?.fullName || approverTitle,
+            reviewComment: reviewerComment || `Approved by ${approverTitle}`,
             updatedAt: new Date().toISOString(),
           };
         }

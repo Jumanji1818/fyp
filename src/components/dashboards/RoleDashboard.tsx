@@ -107,6 +107,8 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
   // Compute common metrics strictly scoped to the active organization
   const totalSpendThisYear = orgPayments.reduce((acc, p) => acc + p.amount, 0);
   const activeTenders = orgTenders.filter((t) => t.status === 'Open');
+  const isSole = currentOrganization.type === 'sole_proprietorship';
+  const pendingRequestsCount = orgRequests.filter((r) => r.status === 'Submitted').length;
   const pendingStaffCount = orgUsers.filter((u) => u.status === 'Pending').length;
   const overduePOs = orgPOs.filter((po) => {
     if (po.status === 'Closed' || po.status === 'Cancelled' || po.status === 'Delivered') return false;
@@ -226,16 +228,23 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
               </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D] shadow-lg">
+            <div
+              onClick={() => onNavigate(isSole ? 'approvals' : pendingStaffCount > 0 ? 'users' : 'approvals')}
+              className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D] shadow-lg cursor-pointer hover:border-[#D4AF37]/50 transition-colors"
+            >
               <div className="flex items-center justify-between text-xs text-[#A8B5AB]">
-                <span>Pending Approvals</span>
-                <Users className="w-4 h-4 text-[#E0A93B]" />
+                <span>{isSole ? 'Requisitions Pending Approval' : 'Pending Approvals'}</span>
+                {isSole ? <CheckCircle className="w-4 h-4 text-[#E0A93B]" /> : <Users className="w-4 h-4 text-[#E0A93B]" />}
               </div>
               <div className="mt-2 text-2xl font-bold font-serif-heading text-[#E0A93B]">
-                <AnimatedCounter value={pendingStaffCount} />
+                <AnimatedCounter value={isSole ? pendingRequestsCount : (pendingStaffCount || pendingRequestsCount)} />
               </div>
               <div className="text-[11px] text-[#A8B5AB] mt-1">
-                Staff accounts awaiting role assignment
+                {isSole
+                  ? `${pendingRequestsCount} requisition${pendingRequestsCount === 1 ? '' : 's'} awaiting your authorization`
+                  : pendingStaffCount > 0
+                  ? 'Staff accounts awaiting role assignment'
+                  : `${pendingRequestsCount} requisitions in approval queue`}
               </div>
             </div>
           </div>
