@@ -14,13 +14,15 @@ import {
   Calendar,
   Lock,
   ArrowRight,
-  Sparkles,
+  Printer,
+  Download,
   Eye,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { StatusChip } from '../common/StatusChip';
 import { Modal } from '../common/Modal';
-import { Tender, Bid, BidItem } from '../../types';
+import { PrintViewModal, DocumentData } from '../common/PrintViewModal';
+import { Tender, Bid, BidItem, PurchaseOrder } from '../../types';
 
 interface VendorPortalModuleProps {
   activeView: 'tenders' | 'bids' | 'contracts' | 'deliveries' | 'payments';
@@ -80,6 +82,100 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
   // Dispatch state
   const [dispatchingPO, setDispatchingPO] = useState<any | null>(null);
   const [dispatchNotes, setDispatchNotes] = useState('');
+
+  // Print & Document Modal State
+  const [printDoc, setPrintDoc] = useState<DocumentData | null>(null);
+  const [viewingContractPO, setViewingContractPO] = useState<PurchaseOrder | null>(null);
+
+  const openVendorAwardLetter = (po: PurchaseOrder) => {
+    const tender = tenders.find((t) => t.id === po.tenderId || t.referenceNumber === po.tenderReference);
+    const matchedBid = bids.find(
+      (b) => (b.tenderId === po.tenderId || b.tenderReference === po.tenderReference) && b.vendorId === currentVendor.id
+    );
+
+    setPrintDoc({
+      type: 'Award Letter',
+      reference: `AL-${po.tenderReference}`,
+      title: tender?.title || `Contract for ${po.tenderReference}`,
+      date: new Date(po.issuedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }),
+      recipientName: currentVendor.name,
+      recipientAddress: currentVendor.address || 'Victoria Island, Lagos / Abuja FCT, Nigeria',
+      recipientAttention: currentVendor.contactPerson || 'Managing Director',
+      department: po.departmentName,
+      amount: po.totalAmount,
+      items: po.items.map((i) => ({
+        description: i.description,
+        quantity: i.quantity,
+        unit: i.unit,
+        unitPrice: i.unitPrice,
+        totalPrice: i.totalPrice,
+      })),
+      awardDetails: {
+        tenderReference: po.tenderReference,
+        tenderTitle: tender?.title || `Procurement Contract: ${po.tenderReference}`,
+        bidReference: matchedBid?.referenceNumber,
+        deliveryDate: po.expectedDeliveryDate,
+        warrantyPeriod: matchedBid?.warrantyPeriod || '12 Months OEM Warranty',
+        procurementOfficerName: tender?.createdByName || 'Tenders & Procurement Directorate',
+      },
+    });
+  };
+
+  const openVendorPrintPO = (po: PurchaseOrder) => {
+    setPrintDoc({
+      type: 'Purchase Order',
+      reference: po.referenceNumber,
+      title: `Official Executed Purchase Order & Contract: ${po.tenderReference}`,
+      date: new Date(po.issuedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      recipientName: currentVendor.name,
+      recipientAddress: currentVendor.address,
+      department: po.departmentName,
+      amount: po.totalAmount,
+      items: po.items.map((i) => ({
+        description: i.description,
+        quantity: i.quantity,
+        unit: i.unit,
+        unitPrice: i.unitPrice,
+        totalPrice: i.totalPrice,
+      })),
+      terms: po.terms,
+      metaFields: [
+        { label: 'Expected Delivery Date', value: po.expectedDeliveryDate },
+        { label: 'Delivery Location', value: po.deliveryLocation },
+        { label: 'Status', value: po.status },
+        { label: 'Acknowledged', value: po.acknowledgedAt ? `Yes (${new Date(po.acknowledgedAt).toLocaleDateString()})` : 'Pending' },
+      ],
+    });
+  };
+
+  const openPrintBidProposal = (bid: Bid) => {
+    const tender = tenders.find((t) => t.id === bid.tenderId || t.referenceNumber === bid.tenderReference);
+    setPrintDoc({
+      type: 'Bid Proposal',
+      reference: bid.referenceNumber,
+      title: `Sealed Tender Proposal: ${tender?.title || bid.tenderReference}`,
+      date: new Date(bid.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      recipientName: currentVendor.name,
+      recipientAddress: currentVendor.address,
+      department: tender?.departmentName,
+      amount: bid.totalAmount,
+      items: bid.items.map((i) => ({
+        description: i.description,
+        quantity: i.quantity,
+        unit: i.unit,
+        unitPrice: i.unitPrice,
+        totalPrice: i.totalPrice,
+      })),
+      notes: bid.technicalProposal ? `Technical Methodology & Scope:\n${bid.technicalProposal}` : undefined,
+      terms: `1. Committed delivery milestone: ${bid.proposedDeliveryDate}\n2. Warranty guarantee: ${bid.warrantyPeriod || '12 Months'}\n3. Proposal is sealed and legally binding under procurement stipulations.`,
+      metaFields: [
+        { label: 'Tender Reference', value: bid.tenderReference },
+        { label: 'Committed Delivery Date', value: bid.proposedDeliveryDate },
+        { label: 'Warranty Period', value: bid.warrantyPeriod || '12 Months' },
+        { label: 'Bid Status', value: bid.status },
+      ],
+    });
+  };
 
   const openBidForm = (t: Tender) => {
     const existing = bids.find((b) => b.tenderId === t.id && b.vendorId === currentVendor.id);
@@ -305,18 +401,19 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
                   <th className="py-3 px-4">Warranty</th>
                   <th className="py-3 px-4 text-center">Bid Status</th>
                   <th className="py-3 px-4">Submitted At</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1F3A2D]">
                 {vendorBids.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-10 text-center text-[#A8B5AB]">
+                    <td colSpan={8} className="py-10 text-center text-[#A8B5AB]">
                       No bids submitted yet.
                     </td>
                   </tr>
                 ) : (
                   vendorBids.map((b) => (
-                    <tr key={b.id} className="hover:bg-[#132A20]/50">
+                    <tr key={b.id} className="hover:bg-[#132A20]/50 transition-colors">
                       <td className="py-3 px-4 font-mono font-bold text-[#E8CF7A]">{b.referenceNumber}</td>
                       <td className="py-3 px-4 font-mono text-[#F2EFE6]">{b.tenderReference}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-[#F2EFE6]">
@@ -329,6 +426,15 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
                       </td>
                       <td className="py-3 px-4 text-[#A8B5AB]">
                         {new Date(b.submittedAt).toLocaleDateString()}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          onClick={() => setViewingSubmittedBid(b)}
+                          className="px-2.5 py-1.5 rounded-lg bg-[#132A20] hover:bg-[#1F3A2D] text-[#D4AF37] border border-[#D4AF37]/50 text-xs font-semibold inline-flex items-center gap-1.5 transition-all shadow active:scale-95"
+                          title="View sealed bid details in read-only mode"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> View Sealed Bid
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -345,7 +451,7 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
           <div className="mb-4">
             <h2 className="text-lg font-bold font-serif-heading text-[#F2EFE6]">Awarded Contracts</h2>
             <p className="text-xs text-[#A8B5AB]">
-              Contracts won through competitive tender evaluation.
+              Legally binding procurement contracts won through competitive evaluation. Contracts cannot be altered after execution.
             </p>
           </div>
 
@@ -356,7 +462,7 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
               vendorPOs.map((po) => (
                 <div
                   key={po.id}
-                  className="p-4 rounded-xl bg-[#132A20] border border-[#1F3A2D] flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  className="p-4 rounded-xl bg-[#132A20] border border-[#1F3A2D] flex flex-col lg:flex-row lg:items-center justify-between gap-4"
                 >
                   <div>
                     <div className="flex items-center gap-2">
@@ -366,13 +472,33 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
                       </span>
                     </div>
                     <div className="text-[11px] text-[#A8B5AB] mt-1">
-                      Department: {po.departmentName} · Contract Value: ₦{po.totalAmount.toLocaleString()} · Expected Delivery:{' '}
-                      {po.expectedDeliveryDate}
+                      Department: {po.departmentName} · Contract Value: <strong className="text-[#F2EFE6]">₦{po.totalAmount.toLocaleString()}</strong> · Expected Delivery:{' '}
+                      <strong className="text-[#E8CF7A]">{po.expectedDeliveryDate}</strong>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
                     <StatusChip status={po.status} />
+                    <button
+                      onClick={() => setViewingContractPO(po)}
+                      className="px-3 py-1.5 rounded-lg bg-[#0D1F17] hover:bg-[#1F3A2D] text-[#F2EFE6] border border-[#1F3A2D] text-xs font-semibold inline-flex items-center gap-1.5 transition-all shadow active:scale-95"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-[#A8B5AB]" /> View Contract
+                    </button>
+                    <button
+                      onClick={() => openVendorAwardLetter(po)}
+                      className="px-3 py-1.5 rounded-lg bg-[#132A20] hover:bg-[#1F3A2D] text-[#D4AF37] border border-[#D4AF37]/50 text-xs font-semibold inline-flex items-center gap-1.5 transition-all shadow active:scale-95"
+                      title="Inspect, print, or download official formal Letter of Award"
+                    >
+                      <Award className="w-3.5 h-3.5 text-[#D4AF37]" /> Official Award Letter
+                    </button>
+                    <button
+                      onClick={() => openVendorPrintPO(po)}
+                      className="px-3 py-1.5 rounded-lg bg-[#1F6F4A] hover:bg-[#14573A] text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-all shadow active:scale-95"
+                      title="Print or Save official Purchase Order & Contract document"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-white" /> Print / Save PO
+                    </button>
                   </div>
                 </div>
               ))
@@ -800,7 +926,14 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
               </div>
             )}
 
-            <div className="flex justify-end pt-2 border-t border-[#1F3A2D]">
+            <div className="flex items-center justify-between pt-2 border-t border-[#1F3A2D]">
+              <button
+                type="button"
+                onClick={() => openPrintBidProposal(viewingSubmittedBid)}
+                className="px-3.5 py-2 rounded-lg bg-[#132A20] hover:bg-[#1F3A2D] text-[#D4AF37] border border-[#D4AF37]/50 text-xs font-semibold flex items-center gap-1.5 transition-all shadow active:scale-95"
+              >
+                <Printer className="w-3.5 h-3.5 text-[#D4AF37]" /> Print / Save Sealed Bid
+              </button>
               <button
                 type="button"
                 onClick={() => setViewingSubmittedBid(null)}
@@ -812,6 +945,147 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
           </div>
         </Modal>
       )}
+
+      {/* VIEW CONTRACT & PURCHASE ORDER MODAL (Strictly Read-Only for Vendors) */}
+      {viewingContractPO && (
+        <Modal
+          isOpen={!!viewingContractPO}
+          onClose={() => setViewingContractPO(null)}
+          title={`Contract Agreement: ${viewingContractPO.referenceNumber}`}
+          subtitle={`Tender: ${viewingContractPO.tenderReference} · Status: ${viewingContractPO.status}`}
+          maxWidth="max-w-2xl"
+        >
+          <div className="space-y-4 text-xs">
+            {/* Header summary banner */}
+            <div className="p-3.5 rounded-xl bg-[#14573A]/20 border border-[#14573A] flex items-center justify-between">
+              <div>
+                <span className="text-[11px] text-[#A8B5AB] block">Binding Contract Value</span>
+                <span className="text-xl font-bold font-serif-heading text-[#D4AF37]">
+                  ₦{viewingContractPO.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-[11px] text-[#A8B5AB] block">Contract Milestone Delivery</span>
+                <span className="font-semibold text-[#F2EFE6]">{viewingContractPO.expectedDeliveryDate}</span>
+              </div>
+            </div>
+
+            {/* Contract particulars */}
+            <div className="grid grid-cols-2 gap-3 bg-[#132A20] p-3.5 rounded-xl border border-[#1F3A2D]">
+              <div>
+                <span className="text-[#A8B5AB] block text-[11px]">Procuring Department:</span>
+                <span className="font-semibold text-[#F2EFE6]">{viewingContractPO.departmentName}</span>
+              </div>
+              <div>
+                <span className="text-[#A8B5AB] block text-[11px]">Delivery Destination:</span>
+                <span className="font-semibold text-[#F2EFE6]">{viewingContractPO.deliveryLocation}</span>
+              </div>
+              <div>
+                <span className="text-[#A8B5AB] block text-[11px]">Date Issued:</span>
+                <span className="font-semibold text-[#F2EFE6]">
+                  {new Date(viewingContractPO.issuedAt).toLocaleDateString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-[#A8B5AB] block text-[11px]">Acknowledgment Status:</span>
+                <span className="font-semibold text-[#3FB67A]">
+                  {viewingContractPO.acknowledgedAt
+                    ? `Acknowledged on ${new Date(viewingContractPO.acknowledgedAt).toLocaleDateString()}`
+                    : 'Legally Binding & Active'}
+                </span>
+              </div>
+            </div>
+
+            {/* Scope of Supply Table */}
+            <div>
+              <span className="font-bold text-[#F2EFE6] block mb-2">Scope of Supply & Priced Bill of Quantities:</span>
+              <div className="rounded-xl border border-[#1F3A2D] overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#132A20] text-[#A8B5AB] border-b border-[#1F3A2D]">
+                    <tr>
+                      <th className="p-2.5">Item Description</th>
+                      <th className="p-2.5 text-center">Qty</th>
+                      <th className="p-2.5 text-right">Unit Rate</th>
+                      <th className="p-2.5 text-right">Total (₦)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1F3A2D]">
+                    {viewingContractPO.items.map((it, idx) => (
+                      <tr key={idx} className="bg-[#0D1F17]">
+                        <td className="p-2.5 font-medium text-[#F2EFE6]">{it.description}</td>
+                        <td className="p-2.5 text-center font-mono">
+                          {it.quantity} {it.unit}
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-[#A8B5AB]">
+                          ₦{it.unitPrice.toLocaleString()}
+                        </td>
+                        <td className="p-2.5 text-right font-mono font-bold text-[#F2EFE6]">
+                          ₦{it.totalPrice.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-[#132A20] font-bold text-[#D4AF37]">
+                      <td colSpan={3} className="p-2.5 text-right uppercase">
+                        Contract Total:
+                      </td>
+                      <td className="p-2.5 text-right font-mono">
+                        ₦{viewingContractPO.totalAmount.toLocaleString()}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            {/* Contract terms */}
+            {viewingContractPO.terms && (
+              <div>
+                <span className="font-bold text-[#F2EFE6] block mb-1">Contract Stipulations & Terms:</span>
+                <div className="p-3 rounded-lg bg-[#07130E] border border-[#1F3A2D] text-[#A8B5AB] whitespace-pre-line leading-relaxed">
+                  {viewingContractPO.terms}
+                </div>
+              </div>
+            )}
+
+            {/* Actions Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#1F3A2D]">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openVendorAwardLetter(viewingContractPO)}
+                  className="px-3.5 py-2 rounded-lg bg-[#132A20] hover:bg-[#1F3A2D] text-[#D4AF37] border border-[#D4AF37]/50 text-xs font-semibold flex items-center gap-1.5 transition-all shadow active:scale-95"
+                >
+                  <Award className="w-3.5 h-3.5 text-[#D4AF37]" /> Official Award Letter
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openVendorPrintPO(viewingContractPO)}
+                  className="px-3.5 py-2 rounded-lg bg-[#1F6F4A] hover:bg-[#14573A] text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow active:scale-95"
+                >
+                  <Printer className="w-3.5 h-3.5 text-white" /> Print / Save PO
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewingContractPO(null)}
+                className="px-5 py-2 rounded-lg bg-[#132A20] hover:bg-[#1F3A2D] text-[#F2EFE6]"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* PRINTABLE OFFICIAL DOCUMENT MODAL (Dedicated Document Isolation for Print / Save) */}
+      <PrintViewModal
+        isOpen={!!printDoc}
+        onClose={() => setPrintDoc(null)}
+        doc={printDoc}
+      />
     </div>
   );
 };

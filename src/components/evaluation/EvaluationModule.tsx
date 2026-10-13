@@ -164,18 +164,41 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({
       setIsAwarding(false);
       setCelebrationOpen(true);
 
-      // Awarded! Generate and show Award Letter PDF (Section 6.6)
+      // Awarded! Generate and show formal Award Letter (Section 6.6)
+      const awardedVendor = vendors.find((v) => v.id === winBid?.vendorId);
       setAwardLetterDoc({
         type: 'Award Letter',
         reference: `AL-${currentTender.referenceNumber}`,
-        title: `Official Notification of Contract Award: ${currentTender.title}`,
-        date: new Date().toLocaleDateString('en-GB'),
+        title: currentTender.title,
+        date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }),
         recipientName: winBid?.vendorName || 'Awarded Vendor',
-        recipientAddress: 'Nigeria',
+        recipientAddress: awardedVendor?.address || 'Victoria Island, Lagos / Abuja FCT, Nigeria',
+        recipientAttention: awardedVendor?.contactPerson || 'Managing Director / Corporate Contracts Representative',
         department: currentTender.departmentName,
         amount: winBid?.totalAmount,
-        notes: `We are pleased to inform you that your bid proposal reference ${winBid?.referenceNumber} for ${currentTender.title} has been accepted following formal technical, commercial, and historical evaluation. You are hereby issued this contract under the agreed schedule.`,
-        terms: `1. Fulfillment must strictly adhere to committed completion schedule by ${winBid?.proposedDeliveryDate}.\n2. Delivery of goods is subject to inspection and quality acceptance by the procurement verification committee.\n3. Non-performance or unexcused delays incur liquidated damages per standard procurement guidelines.`,
+        items: winBid?.items && winBid.items.length > 0
+          ? winBid.items.map((it) => ({
+              description: it.description,
+              quantity: it.quantity,
+              unit: it.unit,
+              unitPrice: it.unitPrice,
+              totalPrice: it.totalPrice,
+            }))
+          : currentTender.items.map((it) => ({
+              description: it.description,
+              quantity: it.quantity,
+              unit: it.unit,
+              unitPrice: (winBid?.totalAmount || 0) / (currentTender.items.length || 1),
+              totalPrice: (winBid?.totalAmount || 0) / (currentTender.items.length || 1),
+            })),
+        awardDetails: {
+          tenderReference: currentTender.referenceNumber,
+          tenderTitle: currentTender.title,
+          bidReference: winBid?.referenceNumber,
+          deliveryDate: winBid?.proposedDeliveryDate || currentTender.submissionDeadline,
+          warrantyPeriod: winBid?.warrantyPeriod || '12 Months Comprehensive OEM Warranty',
+          procurementOfficerName: currentTender.createdByName || currentUser?.fullName,
+        },
       });
     }, 250);
   };
@@ -405,17 +428,40 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({
               <button
                 onClick={() => {
                   if (awardedBid) {
+                    const awardedVendor = vendors.find((v) => v.id === awardedBid.vendorId);
                     setAwardLetterDoc({
                       type: 'Award Letter',
                       reference: `AL-${currentTender.referenceNumber}`,
-                      title: `Official Notification of Contract Award: ${currentTender.title}`,
-                      date: new Date().toLocaleDateString('en-GB'),
+                      title: currentTender.title,
+                      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }),
                       recipientName: awardedBid.vendorName,
-                      recipientAddress: 'Nigeria',
+                      recipientAddress: awardedVendor?.address || 'Victoria Island, Lagos / Abuja FCT, Nigeria',
+                      recipientAttention: awardedVendor?.contactPerson || 'Managing Director / Corporate Contracts Representative',
                       department: currentTender.departmentName,
                       amount: awardedBid.totalAmount,
-                      notes: `Contract has been successfully awarded following formal evaluation and scoring.`,
-                      terms: `1. Fulfillment must strictly adhere to committed schedule.\n2. Standard inspection applies upon delivery.`,
+                      items: awardedBid.items && awardedBid.items.length > 0
+                        ? awardedBid.items.map((it) => ({
+                            description: it.description,
+                            quantity: it.quantity,
+                            unit: it.unit,
+                            unitPrice: it.unitPrice,
+                            totalPrice: it.totalPrice,
+                          }))
+                        : currentTender.items.map((it) => ({
+                            description: it.description,
+                            quantity: it.quantity,
+                            unit: it.unit,
+                            unitPrice: (awardedBid.totalAmount || 0) / (currentTender.items.length || 1),
+                            totalPrice: (awardedBid.totalAmount || 0) / (currentTender.items.length || 1),
+                          })),
+                      awardDetails: {
+                        tenderReference: currentTender.referenceNumber,
+                        tenderTitle: currentTender.title,
+                        bidReference: awardedBid.referenceNumber,
+                        deliveryDate: awardedBid.proposedDeliveryDate || currentTender.submissionDeadline,
+                        warrantyPeriod: awardedBid.warrantyPeriod || '12 Months Comprehensive OEM Warranty',
+                        procurementOfficerName: currentTender.createdByName || currentUser?.fullName,
+                      },
                     });
                   }
                 }}

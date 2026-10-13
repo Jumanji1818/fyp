@@ -10,6 +10,7 @@ import {
   Building,
   Eye,
   Check,
+  Award,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { StatusChip } from '../common/StatusChip';
@@ -22,7 +23,7 @@ interface PurchaseOrdersModuleProps {
 }
 
 export const PurchaseOrdersModule: React.FC<PurchaseOrdersModuleProps> = ({ initialPoId }) => {
-  const { purchaseOrders, currentUser, acknowledgePO, currentOrganization } = useApp();
+  const { purchaseOrders, tenders, bids, currentUser, acknowledgePO, currentOrganization } = useApp();
 
   const orgPOs = purchaseOrders.filter((po) =>
     po.organizationId ? po.organizationId === currentOrganization.id : currentOrganization.id === 'org-emerald'
@@ -60,6 +61,40 @@ export const PurchaseOrdersModule: React.FC<PurchaseOrdersModuleProps> = ({ init
         { label: 'Delivery Destination', value: po.deliveryLocation },
         { label: 'Order Status', value: po.status },
       ],
+    });
+  };
+
+  const openAwardLetterForPO = (po: PurchaseOrder) => {
+    const tender = tenders.find((t) => t.id === po.tenderId || t.referenceNumber === po.tenderReference);
+    const matchedBid = bids.find(
+      (b) => (b.tenderId === po.tenderId || b.tenderReference === po.tenderReference) && b.vendorId === po.vendorId
+    );
+
+    setPrintDoc({
+      type: 'Award Letter',
+      reference: `AL-${po.tenderReference}`,
+      title: tender?.title || `Contract Award for ${po.tenderReference}`,
+      date: new Date(po.issuedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }),
+      recipientName: po.vendorName,
+      recipientAddress: po.vendorAddress || 'Victoria Island, Lagos / Abuja FCT, Nigeria',
+      recipientAttention: 'Managing Director / Corporate Contracts Representative',
+      department: po.departmentName,
+      amount: po.totalAmount,
+      items: po.items.map((i) => ({
+        description: i.description,
+        quantity: i.quantity,
+        unit: i.unit,
+        unitPrice: i.unitPrice,
+        totalPrice: i.totalPrice,
+      })),
+      awardDetails: {
+        tenderReference: po.tenderReference,
+        tenderTitle: tender?.title || `Procurement Contract: ${po.tenderReference}`,
+        bidReference: matchedBid?.referenceNumber,
+        deliveryDate: po.expectedDeliveryDate,
+        warrantyPeriod: matchedBid?.warrantyPeriod || '12 Months Comprehensive OEM Warranty',
+        procurementOfficerName: tender?.createdByName || 'Tenders & Procurement Directorate',
+      },
     });
   };
 
@@ -147,9 +182,16 @@ export const PurchaseOrdersModule: React.FC<PurchaseOrdersModuleProps> = ({ init
                           </button>
                         )}
                         <button
+                          onClick={() => openAwardLetterForPO(po)}
+                          className="p-1.5 rounded-lg bg-[#132A20] hover:bg-[#1F3A2D] text-[#D4AF37] border border-[#D4AF37]/40"
+                          title="Official Award Letter"
+                        >
+                          <Award className="w-3.5 h-3.5" />
+                        </button>
+                        <button
                           onClick={() => openPrintPO(po)}
                           className="p-1.5 rounded-lg bg-[#132A20] hover:bg-[#1F3A2D] text-[#D4AF37] border border-[#1F3A2D]"
-                          title="Print / Save PDF (Green & Gold Template)"
+                          title="Print / Save PO (Green & Gold Template)"
                         >
                           <Printer className="w-3.5 h-3.5" />
                         </button>
@@ -238,13 +280,21 @@ export const PurchaseOrdersModule: React.FC<PurchaseOrdersModuleProps> = ({ init
               <p className="text-[#A8B5AB]">{selectedPO.terms}</p>
             </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-[#1F3A2D]">
-              <button
-                onClick={() => openPrintPO(selectedPO)}
-                className="px-4 py-2 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] font-semibold text-xs flex items-center gap-1.5 hover:brightness-110"
-              >
-                <Printer className="w-3.5 h-3.5 text-[#D4AF37]" /> Export Official PDF
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#1F3A2D]">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => openAwardLetterForPO(selectedPO)}
+                  className="px-3.5 py-2 rounded-[10px] bg-[#132A20] hover:bg-[#1F3A2D] border border-[#D4AF37]/50 text-[#D4AF37] font-semibold text-xs flex items-center gap-1.5 transition-all shadow"
+                >
+                  <Award className="w-3.5 h-3.5 text-[#D4AF37]" /> Official Award Letter
+                </button>
+                <button
+                  onClick={() => openPrintPO(selectedPO)}
+                  className="px-4 py-2 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] font-semibold text-xs flex items-center gap-1.5 hover:brightness-110 shadow"
+                >
+                  <Printer className="w-3.5 h-3.5 text-[#D4AF37]" /> Print / Save PO
+                </button>
+              </div>
 
               <button
                 onClick={() => setSelectedPO(null)}
