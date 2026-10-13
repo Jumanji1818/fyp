@@ -11,15 +11,15 @@ import {
 import { useApp } from '../../context/AppContext';
 
 const CURRENCIES = [
-  { code: 'NGN', symbol: '₦', label: 'Nigerian Naira (₦)' },
-  { code: 'USD', symbol: '\( ', label: 'US Dollar ( \))' },
-  { code: 'GBP', symbol: '£', label: 'British Pound (£)' },
-  { code: 'EUR', symbol: '€', label: 'Euro (€)' },
-  { code: 'GHS', symbol: 'GH₵', label: 'Ghanaian Cedi (GH₵)' },
-  { code: 'KES', symbol: 'KSh', label: 'Kenyan Shilling (KSh)' },
-  { code: 'ZAR', symbol: 'R', label: 'South African Rand (R)' },
-  { code: 'CAD', symbol: 'C\( ', label: 'Canadian Dollar (C \))' },
-];
+    { code: 'NGN', symbol: '₦', label: 'Nigerian Naira (₦)' },
+    { code: 'USD', symbol: '\( ', label: 'US Dollar ( \))' },
+    { code: 'GBP', symbol: '£', label: 'British Pound (£)' },
+    { code: 'EUR', symbol: '€', label: 'Euro (€)' },
+    { code: 'GHS', symbol: 'GH₵', label: 'Ghanaian Cedi (GH₵)' },
+    { code: 'KES', symbol: 'KSh', label: 'Kenyan Shilling (KSh)' },
+    { code: 'ZAR', symbol: 'R', label: 'South African Rand (R)' },
+    { code: 'CAD', symbol: 'C\( ', label: 'Canadian Dollar (C \))' },
+  ];
 
 interface OrganizationSetupPageProps {
   onBack: () => void;
