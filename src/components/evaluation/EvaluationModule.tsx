@@ -90,12 +90,12 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({
   const [techComments, setTechComments] = useState<Record<string, string>>({});
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Recalculate recommendation scores whenever bids or weights change
+  // Recalculate recommendation scores when selected tender changes
   useEffect(() => {
-    if (currentTender) {
+    if (currentTender?.id) {
       calculateVendorRecommendations(currentTender.id);
     }
-  }, [currentTender?.id, bids]);
+  }, [currentTender?.id]);
 
   const handlePassCompliance = (bidId: string, vendorName: string, ref: string) => {
     evaluateCompliance(bidId, true);

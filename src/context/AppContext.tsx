@@ -398,7 +398,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setThemeState(newSettings.theme);
     }
     // Keep currentOrganization and organizations list in sync if org attributes change
-    if (newSettings.name || newSettings.address || newSettings.phone || newSettings.email || newSettings.approvalThreshold !== undefined) {
+    if (newSettings.name || newSettings.address || newSettings.phone || newSettings.email || newSettings.approvalThreshold !== undefined || newSettings.currency) {
       setCurrentOrganization((prev) => {
         const updatedOrg: Organization = {
           ...prev,
@@ -406,6 +406,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           address: newSettings.address ?? prev.address,
           phone: newSettings.phone ?? prev.phone,
           email: newSettings.email ?? prev.email,
+          currency: newSettings.currency ?? prev.currency,
           approvalThreshold: newSettings.approvalThreshold ?? prev.approvalThreshold,
         };
         setOrganizations((allOrgs) =>
@@ -1231,13 +1232,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (b.computedScores) b.computedScores.rank = idx + 1;
     });
 
-    // Update in state
-    setBids((prev) =>
-      prev.map((b) => {
+    // Update in state only if scores actually changed
+    setBids((prev) => {
+      let hasChanges = false;
+      const next = prev.map((b) => {
         const found = scoredBids.find((sb) => sb.id === b.id);
-        return found ? found : b;
-      })
-    );
+        if (!found) return b;
+        const curScore = b.computedScores?.totalWeightedScore;
+        const nextScore = found.computedScores?.totalWeightedScore;
+        const curRank = b.computedScores?.rank;
+        const nextRank = found.computedScores?.rank;
+        if (curScore !== nextScore || curRank !== nextRank) {
+          hasChanges = true;
+          return found;
+        }
+        return b;
+      });
+      return hasChanges ? next : prev;
+    });
 
     return scoredBids;
   };

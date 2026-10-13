@@ -51,6 +51,12 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
   } = useApp();
 
   const role = (currentUser?.role || 'Organization Admin') as UserRole;
+  const currencySymbol =
+    currentOrganization?.currency === 'NGN' ||
+    currentOrganization?.currency === 'Naira' ||
+    !currentOrganization?.currency
+      ? '₦'
+      : currentOrganization.currency;
 
   // Multi-tenant organization data scoping:
   const orgDepts = departments.filter((d) =>
@@ -187,7 +193,7 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
                 <DollarSign className="w-4 h-4 text-[#3FB67A]" />
               </div>
               <div className="mt-2 text-2xl font-bold font-serif-heading text-[#F2EFE6]">
-                <AnimatedCounter value={totalSpendThisYear} prefix="₦" />
+                <AnimatedCounter value={totalSpendThisYear} prefix={currencySymbol} />
               </div>
               <div className="text-[11px] text-[#3FB67A] mt-1 flex items-center gap-1">
                 <TrendingUp className="w-3 h-3" /> Fully audited payments
@@ -263,7 +269,7 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
                         <div className="flex justify-between items-center mb-1">
                           <span className="font-semibold text-[#F2EFE6]">{dept.name}</span>
                           <span className="font-mono text-[#A8B5AB]">
-                            ₦{(dept.spent + dept.committed).toLocaleString()} / ₦{dept.annualBudget.toLocaleString()} (
+                            {currencySymbol}{(dept.spent + dept.committed).toLocaleString()} / {currencySymbol}{dept.annualBudget.toLocaleString()} (
                             <strong className={isFull ? 'text-[#D9534F]' : isHigh ? 'text-[#E0A93B]' : 'text-[#3FB67A]'}>
                               {percentUsed}%
                             </strong>
@@ -274,12 +280,12 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
                           <div
                             className="h-full bg-gradient-to-r from-[#1F6F4A] to-[#3FB67A] transition-all duration-700"
                             style={{ width: dept.annualBudget > 0 ? `${(dept.spent / dept.annualBudget) * 100}%` : '0%' }}
-                            title={`Spent: ₦${dept.spent.toLocaleString()}`}
+                            title={`Spent: ${currencySymbol}${dept.spent.toLocaleString()}`}
                           />
                           <div
                             className="h-full bg-[#E0A93B] transition-all duration-700"
                             style={{ width: dept.annualBudget > 0 ? `${(dept.committed / dept.annualBudget) * 100}%` : '0%' }}
-                            title={`Committed: ₦${dept.committed.toLocaleString()}`}
+                            title={`Committed: ${currencySymbol}${dept.committed.toLocaleString()}`}
                           />
                         </div>
                       </div>
@@ -452,7 +458,7 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
                         <span className="font-semibold text-[#F2EFE6]">{r.title}</span>
                       </div>
                       <div className="text-[11px] text-[#A8B5AB] mt-0.5">
-                        Needed: {r.neededByDate} · Est. Total: ₦{r.estimatedTotal.toLocaleString()}
+                        Needed: {r.neededByDate} · Est. Total: {currencySymbol}{r.estimatedTotal.toLocaleString()}
                       </div>
                     </div>
                     <StatusChip status={r.status} />
@@ -513,7 +519,7 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
               <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
                 <span className="text-xs text-[#A8B5AB]">Department Budget Remaining</span>
                 <div className="text-2xl font-bold font-serif-heading text-[#D4AF37] mt-1">
-                  ₦{deptHeadRemaining.toLocaleString()}
+                  {currencySymbol}{deptHeadRemaining.toLocaleString()}
                 </div>
                 <span className="text-[11px] text-[#A8B5AB]">{userDept?.name || 'Department'}</span>
               </div>
@@ -549,7 +555,7 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
                             {r.title}
                           </div>
                           <div className="text-[11px] text-[#A8B5AB] mt-0.5">
-                            Requester: {r.requesterName} · Est: ₦{r.estimatedTotal.toLocaleString()} · Priority: {r.priority}
+                            Requester: {r.requesterName} · Est: {currencySymbol}{r.estimatedTotal.toLocaleString()} · Priority: {r.priority}
                           </div>
                         </div>
                         <button className="px-3 py-1.5 rounded-lg bg-[#1F6F4A] text-[#F2EFE6] text-xs font-semibold hover:brightness-110">
@@ -658,7 +664,7 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
             <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
               <span className="text-xs text-[#A8B5AB]">Total Disbursements Paid</span>
               <div className="text-2xl font-bold font-serif-heading text-[#3FB67A] mt-1">
-                <AnimatedCounter value={totalSpendThisYear} prefix="₦" />
+                <AnimatedCounter value={totalSpendThisYear} prefix={currencySymbol} />
               </div>
               <span className="text-[11px] text-[#3FB67A]">Disbursed via vouchers</span>
             </div>
@@ -668,7 +674,7 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
               <div className="text-2xl font-bold font-serif-heading text-[#E0A93B] mt-1">
                 <AnimatedCounter
                   value={orgPOs.reduce((acc, po) => acc + (po.totalAmount - po.paidAmount), 0)}
-                  prefix="₦"
+                  prefix={currencySymbol}
                 />
               </div>
               <span className="text-[11px] text-[#E0A93B]">Active PO obligations</span>
@@ -713,7 +719,7 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
                     <div className="flex justify-between font-semibold text-[#F2EFE6] mb-1">
                       <span>{d.name}</span>
                       <span className="font-mono text-[#D4AF37]">
-                        ₦{d.spent.toLocaleString()} / ₦{d.annualBudget.toLocaleString()}
+                        {currencySymbol}{d.spent.toLocaleString()} / {currencySymbol}{d.annualBudget.toLocaleString()}
                       </span>
                     </div>
                     <div className="w-full h-2 bg-[#07130E] rounded-full overflow-hidden">
@@ -748,7 +754,7 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
                   <AnimatedCounter value={highValueAwaiting.length} />
                 </div>
                 <span className="text-[11px] text-[#E0A93B]">
-                  Exceeds ₦{(currentOrganization.approvalThreshold || settings.approvalThreshold).toLocaleString()} threshold
+                  Exceeds {currencySymbol}{(currentOrganization.approvalThreshold || settings.approvalThreshold).toLocaleString()} threshold
                 </span>
               </div>
 
@@ -774,7 +780,7 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
                 Executive Governance Actions
               </h3>
               <p className="text-xs text-[#A8B5AB] mb-4">
-                As the Approving Authority for {currentOrganization.name}, your mandate enforces threshold compliance for awards exceeding ₦{(currentOrganization.approvalThreshold || settings.approvalThreshold).toLocaleString()}.
+                As the Approving Authority for {currentOrganization.name}, your mandate enforces threshold compliance for awards exceeding {currencySymbol}{(currentOrganization.approvalThreshold || settings.approvalThreshold).toLocaleString()}.
               </p>
               <button
                 onClick={() => onNavigate('awards')}
@@ -832,7 +838,7 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
               <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
                 <span className="text-xs text-[#A8B5AB]">Payments Received</span>
                 <div className="text-2xl font-bold font-serif-heading text-[#3FB67A] mt-1">
-                  <AnimatedCounter value={vendorTotalReceived} prefix="₦" />
+                  <AnimatedCounter value={vendorTotalReceived} prefix={currencySymbol} />
                 </div>
                 <span className="text-[11px] text-[#A8B5AB]">Direct bank transfer</span>
               </div>

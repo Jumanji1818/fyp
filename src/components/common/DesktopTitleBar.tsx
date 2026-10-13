@@ -14,11 +14,11 @@ export const DesktopTitleBar: React.FC = () => {
     <div className="hidden sm:flex h-10 border-b border-[#1F3A2D] bg-[#07130E] text-[#F2EFE6] items-center justify-between px-3 select-none text-xs z-50 shrink-0 font-sans">
       {/* Left: Brand & Icon */}
       <div className="flex items-center gap-2.5">
-        <div className="w-5 h-5 rounded-md bg-gradient-to-br from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37] shadow-sm">
-          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current">
-            <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm-1.2 14.5l-3.8-3.8 1.4-1.4 2.4 2.4 5.4-5.4 1.4 1.4-6.8 6.8z" />
-          </svg>
-        </div>
+        <img
+          src="/icon-square.png"
+          alt="Procura"
+          className="w-5 h-5 rounded-md object-cover border border-[#D4AF37]/50 shadow-sm"
+        />
         <span className="font-bold tracking-wider text-[#D4AF37] font-display text-sm">PROCURA</span>
         <span className="text-[#A8B5AB]/60 hidden sm:inline">|</span>
         <span className="text-[#A8B5AB] truncate max-w-[220px] hidden md:inline">

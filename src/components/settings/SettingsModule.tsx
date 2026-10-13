@@ -24,6 +24,7 @@ export const SettingsModule: React.FC = () => {
     settings,
     updateSettings,
     currentUser,
+    currentOrganization,
     users,
     theme,
     setTheme,
@@ -31,6 +32,17 @@ export const SettingsModule: React.FC = () => {
     importDatabaseJson,
     logout,
   } = useApp();
+
+  const CURRENCIES = [
+    { code: 'NGN', symbol: '₦', label: 'Nigerian Naira (₦)' },
+    { code: 'USD', symbol: '$', label: 'US Dollar ($)' },
+    { code: 'GBP', symbol: '£', label: 'British Pound (£)' },
+    { code: 'EUR', symbol: '€', label: 'Euro (€)' },
+    { code: 'GHS', symbol: 'GH₵', label: 'Ghanaian Cedi (GH₵)' },
+    { code: 'KES', symbol: 'KSh', label: 'Kenyan Shilling (KSh)' },
+    { code: 'ZAR', symbol: 'R', label: 'South African Rand (R)' },
+    { code: 'CAD', symbol: 'C$', label: 'Canadian Dollar (C$)' },
+  ];
 
   const isAdmin = currentUser?.role === 'Organization Admin';
   const [activeTab, setActiveTab] = useState<string>('profile');
@@ -51,6 +63,9 @@ export const SettingsModule: React.FC = () => {
   const [orgAddress, setOrgAddress] = useState(settings.address);
   const [orgPhone, setOrgPhone] = useState(settings.phone);
   const [orgEmail, setOrgEmail] = useState(settings.email);
+  const [orgCurrency, setOrgCurrency] = useState(
+    currentOrganization?.currency || settings.currency || '₦'
+  );
 
   // Backup confirmation
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
@@ -74,6 +89,7 @@ export const SettingsModule: React.FC = () => {
       address: orgAddress,
       phone: orgPhone,
       email: orgEmail,
+      currency: orgCurrency,
     });
     showSaved();
   };
@@ -438,6 +454,24 @@ export const SettingsModule: React.FC = () => {
                   className="w-full px-3 py-2 rounded-lg bg-[#132A20] border border-[#1F3A2D] text-[#F2EFE6]"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-[#A8B5AB] font-medium mb-1">Operating Currency</label>
+              <select
+                value={orgCurrency}
+                onChange={(e) => setOrgCurrency(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-[#132A20] border border-[#1F3A2D] text-[#F2EFE6]"
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.symbol}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+              <span className="text-[11px] text-[#A8B5AB] mt-1 block">
+                All financial dashboard widgets, requisitions, budgets, and vouchers will display in this currency.
+              </span>
             </div>
 
             <button

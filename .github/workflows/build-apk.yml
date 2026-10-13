@@ -63,3 +63,23 @@ jobs:
           name: Procura-Android-APK
           path: build-output/Procura-Procurement-Mobile.apk
           retention-days: 30
+
+      - name: Create or Update GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/master')
+        with:
+          tag_name: v1.0.0
+          name: Procura Procurement & Asset Management Mobile APK
+          body: |
+            ### Procura Mobile Android App (APK)
+            Official Android production build for the Final Year Project (FYP).
+            - **Brand**: Official emerald & gold theme and custom launcher icons (no legacy blue/white robot icons)
+            - **Currency**: Full support for Nigerian Naira (₦) throughout dashboards, requisitions, budgets, and vouchers
+            - **Downloads**: Clean, natural navigation title bar
+            
+            Download `Procura-Procurement-Mobile.apk` below directly to your Android device to install and test.
+          files: build-output/Procura-Procurement-Mobile.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+

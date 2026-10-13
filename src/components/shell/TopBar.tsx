@@ -16,6 +16,8 @@ import {
   Landmark,
   LogOut,
   Compass,
+  FileText,
+  Download,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { PWAInstallButton } from '../common/PWAInstallButton';
@@ -156,6 +158,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span className="hidden md:inline">Process Guide</span>
           </button>
         )}
+
+
 
         {/* Organization Badge (Static, non-clickable) */}
         {currentUser?.role === 'Vendor' ? (

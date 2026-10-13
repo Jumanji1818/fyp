@@ -91,16 +91,16 @@ export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row bg-[#07130E] text-[#F2EFE6] overflow-hidden min-h-[calc(100vh-2.5rem)]">
+    <div className="flex-1 flex flex-col md:flex-row bg-[#07130E] text-[#F2EFE6] overflow-y-auto md:overflow-hidden min-h-full">
       {/* Left 55%: Brand Panel */}
-      <div className="w-full md:w-[55%] p-8 md:p-14 bg-gradient-to-br from-[#0F3D2A] via-[#07130E] to-[#07130E] border-r border-[#1F3A2D] flex flex-col justify-between relative overflow-hidden">
+      <div className="w-full md:w-[55%] p-8 md:p-14 bg-gradient-to-br from-[#0F3D2A] via-[#07130E] to-[#07130E] border-r border-[#1F3A2D] flex flex-col justify-between relative overflow-hidden shrink-0">
         {/* Subtle radial gold glow */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#D4AF37]/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Top Header */}
         <div className="relative z-10 flex items-center gap-3">
           <img
-            src="/1791779045601.jpg"
+            src="/icon-square.png"
             alt="Procura"
             className="w-10 h-10 rounded-xl object-cover border border-[#D4AF37] shadow-lg"
           />
@@ -111,7 +111,7 @@ export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
         </div>
 
         {/* Main Pitch */}
-        <div className="relative z-10 my-10 max-w-lg">
+        <div className="relative z-10 my-6 md:my-10 max-w-lg">
           <h1 className="text-3xl md:text-5xl font-black font-serif-heading text-[#F2EFE6] leading-tight mb-6">
             Procurement that <span className="text-[#D4AF37]">thinks ahead.</span>
           </h1>
@@ -162,8 +162,8 @@ export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
         </div>
       </div>
 
-      {/* Right 45%: Surface Card / Setup Wizard */}
-      <div className="w-full md:w-[45%] p-8 md:p-12 flex flex-col justify-center bg-[#07130E] relative overflow-y-auto">
+      {/* Right 45%: Surface Card / Setup Wizard (Stationary, no independent text slide) */}
+      <div className="w-full md:w-[45%] p-8 md:p-12 flex flex-col justify-center bg-[#07130E] relative overflow-visible md:overflow-y-auto">
         <div className="max-w-md w-full mx-auto">
           {/* Welcome mode: initial buttons */}
           {step === 'welcome' && (
@@ -177,22 +177,25 @@ export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
 
               <div className="space-y-3 pt-2">
                 <button
+                  type="button"
                   onClick={onSetupOrganization}
-                  className="w-full py-3 px-4 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] font-semibold text-sm hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg"
+                  className="w-full py-3 px-4 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] font-semibold text-sm hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg"
                 >
                   <Building className="w-4 h-4 text-[#D4AF37]" />
                   Set up my organization
                 </button>
 
                 <button
+                  type="button"
                   onClick={onGoToVendorRegister}
-                  className="w-full py-3 px-4 rounded-[10px] bg-[#0D1F17] border border-[#D4AF37] text-[#D4AF37] font-semibold text-sm hover:bg-[#132A20] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 px-4 rounded-[10px] bg-[#0D1F17] border border-[#D4AF37] text-[#D4AF37] font-semibold text-sm hover:bg-[#132A20] transition-all flex items-center justify-center gap-2"
                 >
                   <Shield className="w-4 h-4" />
                   I am a vendor, register
                 </button>
 
                 <button
+                  type="button"
                   onClick={handleLoadDemo}
                   className="w-full py-3 px-4 rounded-[10px] bg-[#132A20] border border-[#1F3A2D] hover:border-[#D4AF37]/60 text-[#E8CF7A] font-semibold text-xs transition-all flex items-center justify-center gap-2"
                   title="Loads enterprise sample data with pre-populated records across roles"
