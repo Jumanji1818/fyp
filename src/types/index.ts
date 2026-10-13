@@ -209,6 +209,7 @@ export interface Tender {
   pendingAuthorityBidId?: string;
   awaitingAuthorityApproval?: boolean;
   awardedBidId?: string;
+  createdByName?: string; // officer who published the tender (shown on award letters / POs)
 }
 
 export interface BidItem {

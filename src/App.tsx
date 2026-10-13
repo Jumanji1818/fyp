@@ -118,7 +118,7 @@ const MainApp: React.FC = () => {
   return (
     <div className="flex flex-col h-screen h-[100dvh] w-full max-w-full overflow-hidden bg-[#07130E] text-[#F2EFE6] select-none font-sans">
       {/* Frameless Desktop Custom Title Bar (Section 5) */}
-      <DesktopTitleBar />
+      {!(window as any).procuraDesktop && <DesktopTitleBar />}
 
       {/* Splash Screen on startup */}
       {showSplash && (
