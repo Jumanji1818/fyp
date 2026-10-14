@@ -232,7 +232,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
           {/* Email / Phone */}
           <div>
             <label className="block text-[#A8B5AB] font-medium mb-1.5">
-              Email or Phone Number
+              Email Address
             </label>
             <div className="relative">
               <input
