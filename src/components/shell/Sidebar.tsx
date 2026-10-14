@@ -128,6 +128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
         { id: 'payments', label: 'Payment Disbursements', icon: CreditCard },
         { id: 'vendors', label: 'Vendor Directory', icon: Building },
         { id: 'budgets', label: 'Operating Budgets', icon: PieChart },
+        { id: 'awards', label: 'Budget Override Requests', icon: Award },
         { id: 'reports', label: 'Reports & Analytics', icon: BarChart3 },
         { id: 'audit', label: 'Audit Log (Immutable)', icon: ShieldAlert },
         { id: 'settings', label: 'Business Settings', icon: SettingsIcon },
