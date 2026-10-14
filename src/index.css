@@ -1,9 +1,11 @@
+@import "@fontsource-variable/fraunces";
+@import "@fontsource-variable/manrope";
 @import "tailwindcss";
 
 @layer base {
   :root {
-    --font-heading: 'Fraunces', Georgia, serif;
-    --font-body: 'Manrope', system-ui, -apple-system, sans-serif;
+    --font-heading: 'Fraunces Variable', Georgia, serif;
+    --font-body: 'Manrope Variable', system-ui, -apple-system, sans-serif;
 
     /* Dark Mode Defaults */
     --bg-app: #07130E;
