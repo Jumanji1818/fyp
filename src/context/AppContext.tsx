@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { appStorage } from '../utils/storage';
 import { createPasswordRecord, verifyPassword, validatePassword, generateTempPassword, normalizeAnswer, LoginLockout } from '../utils/password';
-import { BID_EVALUATOR_ROLES, canViewBid, canCommitBudget, approvalRequiresAuthority, canRecordPayment as canRecordPaymentRule, applyAcceptedDelivery, calculateReliabilityScore, calculateWeightedScores, resolveBudgetOverride } from '../utils/procurementRules';
+import { BID_EVALUATOR_ROLES, canViewBid, canCommitBudget, approvalRequiresAuthority, canRecordPayment as canRecordPaymentRule, applyAcceptedDelivery, calculateReliabilityScore, calculateWeightedScores, resolveBudgetOverride, canVendorBid, remainingCommitmentAfterCancellation, isSoloOwnerFlow } from '../utils/procurementRules';
 import {
   Organization,
   OrganizationType,
@@ -1329,7 +1329,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const cancelPurchaseOrder = (poId: string, reason: string): boolean => {
     const po = purchaseOrders.find((entry) => entry.id === poId);
     if (!po || (po.organizationId && po.organizationId !== currentOrganization.id) || !reason.trim() || !['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') || ['Delivered', 'Closed', 'Cancelled'].includes(po.status)) return false;
-    const release = Math.max(0, po.totalAmount - po.paidAmount);
+    const release = remainingCommitmentAfterCancellation(po.totalAmount, po.paidAmount);
     setPurchaseOrders((prev) => prev.map((entry) => entry.id === poId ? { ...entry, status: 'Cancelled' } : entry));
     setDepartments((prev) => prev.map((entry) => entry.id === po.departmentId ? { ...entry, committed: Math.max(0, entry.committed - release) } : entry));
     setTenders((prev) => prev.map((entry) => entry.id === po.tenderId ? { ...entry, status: 'Cancelled', awaitingAuthorityApproval: false, pendingAuthorityBidId: undefined, cancellationReason: reason.trim() } : entry));
@@ -1363,7 +1363,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     // Vendors must be explicitly approved by this organization before bidding.
     const effectiveStatus = getVendorEffectiveStatus(vendor, tnd.organizationId || currentOrganization.id);
-    if (effectiveStatus.status !== 'Approved') {
+    if (!canVendorBid(effectiveStatus.status)) {
       throw new Error(effectiveStatus.status === 'Suspended' || effectiveStatus.status === 'Blacklisted'
         ? `Vendor ${vendor.businessName} is currently ${effectiveStatus.status.toLowerCase()} by this organization.`
         : 'Your vendor account must be approved by Procurement before you can bid.');
@@ -1793,7 +1793,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const receiveDelivery = (poId: string, itemsReceived: DeliveryRecord['itemsReceived']) => {
     const po = purchaseOrders.find((p) => p.id === poId);
-    const isSoloOwner = currentOrganization.type === 'sole_proprietorship' && currentUser?.organizationId === currentOrganization.id;
+    const isSoloOwner = isSoloOwnerFlow(currentOrganization.type, currentUser?.organizationId, currentOrganization.id);
     if (!po || !['Request Officer', 'Organization Admin'].includes(currentUser?.role || '') && !isSoloOwner) return;
     if (po.organizationId && po.organizationId !== currentOrganization.id || ['Cancelled', 'Closed'].includes(po.status)) return;
     if (!Array.isArray(itemsReceived) || itemsReceived.length !== po.items.length) return;
@@ -2199,7 +2199,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (data.deliveries) setDeliveries(data.deliveries);
       if (data.payments) setPayments(data.payments);
       if (data.notifications) setNotifications(data.notifications);
-      if (data.budgetOverrideRequests && Array.isArray(data.budgetOverrideRequests)) setBudgetOverrideRequests(data.budgetOverrideRequests);
+      if (data.budgetOverrideRequests && Array.isArray(data.budgetOverrideRequests)) setBudgetOverrideRequests(data.budgetOverrideRequests.map((request: BudgetOverrideRequest) => ({ ...request, status: 'Pending', financeComment: undefined, decidedByUserId: undefined, decidedByName: undefined, decidedAt: undefined })));
       // Audit history is intentionally excluded from imports; only audited application actions may append entries.
       return true;
     } catch {
