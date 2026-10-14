@@ -40,7 +40,6 @@ CREATE TABLE IF NOT EXISTS users (
   vendor_id uuid,
   must_change_password boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (lower(email)),
   FOREIGN KEY (organization_id, department_id) REFERENCES departments(organization_id, id)
 );
 
@@ -52,6 +51,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at timestamptz NOT NULL DEFAULT now(),
   last_seen_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_unique ON users(lower(email));
 CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS users_org_role_idx ON users(organization_id, role);
 
