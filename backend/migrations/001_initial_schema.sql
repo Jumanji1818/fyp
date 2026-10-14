@@ -55,11 +55,11 @@ CREATE TABLE IF NOT EXISTS vendor_profiles (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS vendor_profiles_email_lower_unique ON vendor_profiles(lower(email));
-DO $ BEGIN
+DO $procura$ BEGIN
   ALTER TABLE users ADD CONSTRAINT users_vendor_id_fk
     FOREIGN KEY (vendor_id) REFERENCES vendor_profiles(id) ON DELETE SET NULL;
 EXCEPTION WHEN duplicate_object THEN NULL;
-END $;
+END $procura$;
 
 CREATE TABLE IF NOT EXISTS sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
