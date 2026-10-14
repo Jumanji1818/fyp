@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import pg from 'pg';
 import { z } from 'zod';
 import {
-  createSessionToken, hashPassword, hashSessionToken, normalizeEmail,
+  constantTimeTextEqual, createSessionToken, hashPassword, hashSessionToken, normalizeEmail,
   SESSION_TTL_MS, verifyPassword,
 } from './security.js';
 
@@ -21,7 +21,7 @@ const cookieName = 'procura_session';
 const cookieSecure = process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production';
 const frontendOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
 
-type Role = 'Organization Admin' | 'Request Officer' | 'Department Head' | 'Procurement Officer' | 'Finance Officer' | 'Approving Authority' | 'Vendor';
+type Role = 'Platform Admin' | 'Organization Admin' | 'Request Officer' | 'Department Head' | 'Procurement Officer' | 'Finance Officer' | 'Approving Authority' | 'Vendor';
 type SessionUser = { id: string; organizationId: string | null; departmentId: string | null; fullName: string; email: string; role: Role; status: string; mustChangePassword: boolean };
 declare global {
   namespace Express { interface Request { user?: SessionUser; sessionId?: string } }
@@ -138,6 +138,79 @@ const recordSchema = z.object({
   referenceNumber: z.string().trim().max(100).nullable().optional(),
   status: z.string().trim().min(1).max(80).default('Draft'),
   data: z.record(z.string(), z.unknown()).default({}),
+});
+
+
+const bootstrapSchema = z.object({
+  bootstrapKey: z.string().min(24).max(256),
+  fullName: z.string().trim().min(2).max(120),
+  email: z.string().email().max(254),
+  password: z.string().min(12).max(200),
+});
+
+// Bootstrap is intentionally disabled unless a high-entropy secret is configured at deployment.
+// Remove BOOTSTRAP_ADMIN_KEY after the first platform administrator has been created.
+app.post('/api/admin/bootstrap', async (req, res, next) => {
+  const configuredKey = process.env.BOOTSTRAP_ADMIN_KEY;
+  if (!configuredKey || configuredKey.length < 24) {
+    return res.status(404).json({ error: 'Bootstrap is not enabled.' });
+  }
+  const parsed = bootstrapSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid bootstrap details.', issues: parsed.error.issues });
+  if (!constantTimeTextEqual(parsed.data.bootstrapKey, configuredKey)) {
+    return res.status(403).json({ error: 'Invalid bootstrap key.' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const existing = await client.query("SELECT 1 FROM users WHERE role = 'Platform Admin' LIMIT 1");
+    if (existing.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'A platform administrator has already been created. Disable bootstrap now.' });
+    }
+    const hashed = await hashPassword(parsed.data.password);
+    const created = await client.query(
+      `INSERT INTO users(organization_id,full_name,email,password_hash,role,status)
+       VALUES(NULL,$1,$2,$3,'Platform Admin','active')
+       RETURNING id,organization_id,department_id,full_name,email,phone,role,status,must_change_password`,
+      [parsed.data.fullName,normalizeEmail(parsed.data.email),hashed],
+    );
+    await client.query('COMMIT');
+    return res.status(201).json({ user: publicUser(created.rows[0]), message: 'Platform administrator created. Remove BOOTSTRAP_ADMIN_KEY from the environment.' });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    return next(error);
+  } finally { client.release(); }
+});
+
+app.post('/api/admin/organizations/:organizationId/approve', requireAuth, allowRoles('Platform Admin'), async (req, res, next) => {
+  const organizationId = z.string().uuid().safeParse(req.params.organizationId);
+  if (!organizationId.success) return res.status(400).json({ error: 'Invalid organization ID.' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const org = await client.query(
+      "UPDATE organizations SET status = 'active' WHERE id = $1 AND status = 'pending' RETURNING id,name,status",
+      [organizationId.data],
+    );
+    if (!org.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Pending organization not found.' });
+    }
+    await client.query(
+      "UPDATE users SET status = 'active' WHERE organization_id = $1 AND role = 'Organization Admin' AND status = 'pending'",
+      [organizationId.data],
+    );
+    await client.query(
+      "INSERT INTO audit_events(organization_id,actor_user_id,action,entity_type,entity_id) VALUES($1,$2,'organization.approved','organization',$1)",
+      [organizationId.data,req.user!.id],
+    );
+    await client.query('COMMIT');
+    return res.json({ organization: org.rows[0], message: 'Organization approved. Its administrator can now sign in.' });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    return next(error);
+  } finally { client.release(); }
 });
 
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
