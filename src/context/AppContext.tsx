@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { appStorage } from '../utils/storage';
-import { createPasswordRecord, verifyPassword, validatePassword, generateTempPassword, normalizeAnswer } from '../utils/password';
+import { createPasswordRecord, verifyPassword, validatePassword, generateTempPassword, normalizeAnswer, LoginLockout } from '../utils/password';
+import { BID_EVALUATOR_ROLES, canViewBid, canCommitBudget, approvalRequiresAuthority, canRecordPayment as canRecordPaymentRule, applyAcceptedDelivery, calculateReliabilityScore, calculateWeightedScores, mergeAuditLogAppendOnly } from '../utils/procurementRules';
 import {
   Organization,
   OrganizationType,
@@ -21,6 +22,7 @@ import {
   UserRole,
   RequestStatus,
   TenderStatus,
+  BudgetOverrideRequest,
 } from '../types';
 import {
   INITIAL_ORGANIZATIONS,
@@ -85,6 +87,7 @@ interface AppContextType {
   deliveries: DeliveryRecord[];
   payments: PaymentRecord[];
   budgetChanges: BudgetChange[];
+  budgetOverrideRequests: BudgetOverrideRequest[];
   notifications: NotificationItem[];
   auditLogs: AuditLogEntry[];
   currentUser: User | null;
@@ -118,6 +121,7 @@ interface AppContextType {
   awardTender: (tenderId: string, winningBidId: string, justification?: string) => { requiresAuthority: boolean; poCreated?: PurchaseOrder; blocked?: string };
   authorityApproveAward: (tenderId: string, approved: boolean, reason?: string) => void;
   overrideBudgetAndAward: (tenderId: string, winningBidId: string, overrideReason: string) => { requiresAuthority: boolean; poCreated?: PurchaseOrder; blocked?: string };
+  decideBudgetOverride: (requestId: string, approved: boolean, comment: string) => void;
   acknowledgePO: (poId: string) => void;
   dispatchDelivery: (poId: string, notes: string) => void;
   receiveDelivery: (poId: string, itemsReceived: DeliveryRecord['itemsReceived']) => void;
@@ -271,6 +275,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [budgetOverrideRequests, setBudgetOverrideRequests] = useState<BudgetOverrideRequest[]>(() => {
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'budget_override_requests');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
     const saved = appStorage.getItem(STORAGE_PREFIX + 'notifications');
     const list: NotificationItem[] = saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
@@ -352,6 +361,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     appStorage.setItem(STORAGE_PREFIX + 'budget_changes', JSON.stringify(budgetChanges));
   }, [budgetChanges]);
+  useEffect(() => {
+    appStorage.setItem(STORAGE_PREFIX + 'budget_override_requests', JSON.stringify(budgetOverrideRequests));
+  }, [budgetOverrideRequests]);
   useEffect(() => {
     appStorage.setItem(STORAGE_PREFIX + 'notifications', JSON.stringify(notifications));
   }, [notifications]);
@@ -471,7 +483,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Auth, Organization & Staff Provisioning
-  const loginAttempts = useRef<Record<string, { count: number; lockedUntil: number }>>({});
+  const loginLockout = useRef(new LoginLockout());
 
   const answerRecord = (answer: string) => {
     const r = createPasswordRecord(normalizeAnswer(answer));
@@ -484,23 +496,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return !!u.securityAnswer && normalizeAnswer(answer) === normalizeAnswer(u.securityAnswer); // seeded demo accounts
   };
 
-  /** Returns a lock message if this key is temporarily locked after repeated failures. */
-  const lockMessage = (key: string): string | null => {
-    const rec = loginAttempts.current[key];
-    if (rec && rec.lockedUntil > Date.now()) {
-      return `Too many failed attempts. Try again in ${Math.ceil((rec.lockedUntil - Date.now()) / 60000)} minute(s).`;
-    }
-    return null;
-  };
-  const registerFailure = (key: string) => {
-    const rec = loginAttempts.current[key] || { count: 0, lockedUntil: 0 };
-    rec.count += 1;
-    if (rec.count >= 5) {
-      rec.lockedUntil = Date.now() + 5 * 60 * 1000;
-      rec.count = 0;
-    }
-    loginAttempts.current[key] = rec;
-  };
+  const lockMessage = (key: string): string | null => loginLockout.current.message(key);
+  const registerFailure = (key: string) => loginLockout.current.fail(key);
 
   const login = (email: string, pass: string) => {
     const key = email.trim().toLowerCase();
@@ -514,7 +511,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       registerFailure(key);
       return { success: false, error: 'Incorrect email or password.' };
     }
-    delete loginAttempts.current[key];
+    loginLockout.current.clear(key);
     if (found) {
       if (found.status === 'Pending') {
         return { success: false, error: 'Your account is pending administrator approval.' };
@@ -880,7 +877,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (err) return { success: false, error: err };
     const rec = createPasswordRecord(newPassword);
     setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, ...rec, mustChangePassword: false } : u)));
-    delete loginAttempts.current[key];
+    loginLockout.current.clear(key);
     addAuditLog('Offline Password Reset', user.email, undefined, 'Password Updated', 'Reset via security question.');
     return { success: true };
   };
@@ -916,6 +913,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setPayments(INITIAL_PAYMENTS);
     setNotifications(INITIAL_NOTIFICATIONS);
     setAuditLogs(INITIAL_AUDIT_LOGS);
+    setBudgetOverrideRequests([]);
     setCurrentUser(INITIAL_USERS[0]);
     appStorage.clear();
   };
@@ -1375,6 +1373,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Evaluation & Scoring Algorithm
   const evaluateCompliance = (bidId: string, passed: boolean, reason?: string) => {
+    const target = bids.find((b) => b.id === bidId);
+    const tender = target && tenders.find((t) => t.id === target.tenderId);
+    if (!target || !tender || Date.now() < new Date(tender.bidClosingDateTime).getTime()) return;
+    if (!['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '')) return;
     setBids((prev) =>
       prev.map((b) => {
         if (b.id === bidId) {
@@ -1391,6 +1393,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const evaluateTechnical = (bidId: string, score: number, comments: string) => {
+    const target = bids.find((b) => b.id === bidId);
+    const tender = target && tenders.find((t) => t.id === target.tenderId);
+    if (!target || !tender || Date.now() < new Date(tender.bidClosingDateTime).getTime()) return;
+    if (!['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '')) return;
+    if (!Number.isFinite(score) || score < 0 || score > 100) return;
     setBids((prev) =>
       prev.map((b) => {
         if (b.id === bidId) {
@@ -1408,86 +1415,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const calculateVendorRecommendations = (tenderId: string): Bid[] => {
     const tnd = tenders.find((t) => t.id === tenderId);
-    if (!tnd) return [];
-
+    if (!tnd || !currentUser || !BID_EVALUATOR_ROLES.includes(currentUser.role as UserRole)) return [];
+    if (Date.now() < new Date(tnd.bidClosingDateTime).getTime()) return [];
     const tenderBids = bids.filter((b) => b.tenderId === tenderId && b.compliancePassed !== false);
-    if (tenderBids.length === 0) return [];
-
-    const weights = tnd.evaluationWeights;
-
-    // 1. Price Score: Lowest bid gets 100, others get lowest / their price * 100
-    const prices = tenderBids.map((b) => b.totalAmount).filter((p) => p > 0);
-    const minPrice = Math.min(...prices);
-
-    // 2. Delivery Time Score: Calculate days from today or tender open date to proposed delivery date
-    const deliveryDays = tenderBids.map((b) => {
-      const days = Math.max(1, Math.round((new Date(b.proposedDeliveryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24)));
-      return days;
-    });
-    const minDays = Math.min(...deliveryDays);
-
-    const scoredBids = tenderBids.map((bid) => {
-      const vendor = vendors.find((v) => v.id === bid.vendorId);
-      const priceScore = minPrice > 0 && bid.totalAmount > 0 ? (minPrice / bid.totalAmount) * 100 : 0;
-
-      const currentDays = Math.max(1, Math.round((new Date(bid.proposedDeliveryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24)));
-      const deliveryScore = minDays > 0 ? (minDays / currentDays) * 100 : 100;
-
-      // Reliability Score: from vendor history (neutral 60 if new)
-      const reliabilityScore = vendor ? vendor.reliabilityScore : 60;
-
-      // Technical Score: entered by officer (defaults to 75 if not yet entered)
-      const technicalScore = bid.technicalScore !== undefined ? bid.technicalScore : 75;
-
-      const totalWeightedScore =
-        (priceScore * weights.price +
-          deliveryScore * weights.deliveryTime +
-          reliabilityScore * weights.vendorReliability +
-          technicalScore * weights.technicalScore) /
-        100;
-
-      return {
-        ...bid,
-        computedScores: {
-          priceScore: parseFloat(priceScore.toFixed(1)),
-          deliveryScore: parseFloat(deliveryScore.toFixed(1)),
-          reliabilityScore: parseFloat(reliabilityScore.toFixed(1)),
-          technicalScore: parseFloat(technicalScore.toFixed(1)),
-          totalWeightedScore: parseFloat(totalWeightedScore.toFixed(2)),
-          rank: 0,
-        },
-      };
-    });
-
-    // Rank bids descending by total weighted score
-    scoredBids.sort((a, b) => (b.computedScores?.totalWeightedScore || 0) - (a.computedScores?.totalWeightedScore || 0));
-    scoredBids.forEach((b, idx) => {
-      if (b.computedScores) b.computedScores.rank = idx + 1;
-    });
-
-    // Update in state only if scores actually changed
-    setBids((prev) => {
-      let hasChanges = false;
-      const next = prev.map((b) => {
-        const found = scoredBids.find((sb) => sb.id === b.id);
-        if (!found) return b;
-        const curScore = b.computedScores?.totalWeightedScore;
-        const nextScore = found.computedScores?.totalWeightedScore;
-        const curRank = b.computedScores?.rank;
-        const nextRank = found.computedScores?.rank;
-        if (curScore !== nextScore || curRank !== nextRank) {
-          hasChanges = true;
-          return found;
-        }
-        return b;
-      });
-      return hasChanges ? next : prev;
-    });
-
+    if (!tenderBids.length) return [];
+    const scoredBids = calculateWeightedScores(
+      tenderBids,
+      tnd.evaluationWeights,
+      (bid) => vendors.find((v) => v.id === bid.vendorId)?.reliabilityScore ?? 60,
+    );
+    setBids((prev) => prev.map((bid) => {
+      const scored = scoredBids.find((entry) => entry.id === bid.id);
+      return scored ? { ...bid, computedScores: scored.computedScores } : bid;
+    }));
     return scoredBids;
   };
 
-  // Award Decision & PO Generation
   const awardTender = (
     tenderId: string,
     winningBidId: string,
@@ -1501,21 +1444,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return { requiresAuthority: false, blocked: 'This tender has already been awarded or is awaiting authority approval.' };
     }
     if (winBid.tenderId !== tenderId) return { requiresAuthority: false, blocked: 'That bid does not belong to this tender.' };
+    if (Date.now() < new Date(tnd.bidClosingDateTime).getTime()) return { requiresAuthority: false, blocked: 'Bids remain confidential until the closing time. Awarding is not available yet.' };
+    if (!['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '')) return { requiresAuthority: false, blocked: 'You are not permitted to award this tender.' };
     if (winBid.compliancePassed === false) return { requiresAuthority: false, blocked: 'This bid failed the compliance check and cannot be awarded.' };
 
     const vendor = vendors.find((v) => v.id === winBid.vendorId);
     const dept = departments.find((d) => d.id === tnd.departmentId);
 
-    // Budget enforcement (only a Finance override reason lets an over-budget award through)
-    if (dept && !budgetOverrideReason) {
-      const remaining = dept.annualBudget - dept.spent - dept.committed;
-      if (winBid.totalAmount > remaining) {
-        return { requiresAuthority: false, blocked: `Award exceeds the ${dept.name} remaining budget. A Finance budget override is required.` };
-      }
+    // An officer-entered reason is not an approval. Only a separate Finance decision authorizes an over-budget award.
+    const remaining = dept ? dept.annualBudget - dept.spent - dept.committed : Number.POSITIVE_INFINITY;
+    const approvedOverride = budgetOverrideRequests.find((request) =>
+      request.tenderId === tenderId && request.bidId === winningBidId && request.status === 'Approved'
+    );
+    if (dept && !canCommitBudget(dept.annualBudget, dept.spent, dept.committed, winBid.totalAmount, !!approvedOverride)) {
+      return { requiresAuthority: false, blocked: `Award exceeds the ${dept.name} remaining budget. Submit a Finance override request and wait for approval.` };
+    }
+    if (dept && winBid.totalAmount > remaining && !approvedOverride) {
+      return { requiresAuthority: false, blocked: 'A Finance-approved budget override is required before this award can continue.' };
     }
 
     const threshold = currentOrganization.approvalThreshold || settings.approvalThreshold;
-    const requiresAuthority = winBid.totalAmount > threshold;
+    const requiresAuthority = approvalRequiresAuthority(winBid.totalAmount, threshold);
+    const approvedOverrideReason = approvedOverride?.reason;
 
     if (requiresAuthority) {
       // High-value: NO purchase order until the Approving Authority signs off
@@ -1539,12 +1489,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         tnd.referenceNumber,
         'Under Evaluation',
         'Awaiting Approving Authority',
-        `${winBid.vendorName} at \u20a6${winBid.totalAmount.toLocaleString()}. ${justification || ''}${budgetOverrideReason ? ' Budget override: ' + budgetOverrideReason : ''}`
+        `${winBid.vendorName} at \u20a6${winBid.totalAmount.toLocaleString()}. ${justification || ''}${approvedOverrideReason ? ' Finance-approved budget override: ' + approvedOverrideReason : ''}`
       );
       return { requiresAuthority: true };
     }
 
-    return finalizeAward(tenderId, winBid, vendor, dept, justification);
+    return finalizeAward(tenderId, winBid, vendor, dept, `${justification || ''}${approvedOverrideReason ? ' Finance-approved budget override: ' + approvedOverrideReason : ''}`);
   };
 
   const finalizeAward = (
@@ -1682,16 +1632,78 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const overrideBudgetAndAward = (tenderId: string, winningBidId: string, overrideReason: string) => {
-    const tnd = tenders.find((t) => t.id === tenderId);
-    if (!tnd) return { requiresAuthority: false, blocked: 'Tender not found.' };
-    addAuditLog(
-      'Budget Override Approved by Finance',
-      tnd.referenceNumber,
-      'Budget Exceeded',
-      'Override Granted',
-      `Reason: ${overrideReason}`
-    );
-    return awardTender(tenderId, winningBidId, `Budget override: ${overrideReason}`, overrideReason);
+    const tender = tenders.find((t) => t.id === tenderId);
+    const bid = bids.find((b) => b.id === winningBidId && b.tenderId === tenderId);
+    const dept = tender && departments.find((d) => d.id === tender.departmentId);
+    if (!tender || !bid || !dept) return { requiresAuthority: false, blocked: 'Tender, bid, or department not found.' };
+    if (currentUser?.role !== 'Procurement Officer' && currentUser?.role !== 'Organization Admin') {
+      return { requiresAuthority: false, blocked: 'Only Procurement can submit a budget override request.' };
+    }
+    if (!overrideReason.trim()) return { requiresAuthority: false, blocked: 'A reason is required for the Finance override request.' };
+    const remaining = dept.annualBudget - dept.spent - dept.committed;
+    if (bid.totalAmount <= remaining) return awardTender(tenderId, winningBidId, 'Within remaining budget.');
+    const existing = budgetOverrideRequests.find((request) => request.tenderId === tenderId && request.bidId === winningBidId && request.status === 'Pending');
+    if (existing) return { requiresAuthority: false, blocked: 'A budget override request is already waiting for Finance.' };
+    const request: BudgetOverrideRequest = {
+      id: 'bor-' + Date.now(),
+      organizationId: tender.organizationId || currentOrganization.id,
+      tenderId,
+      tenderReference: tender.referenceNumber,
+      bidId: winningBidId,
+      vendorName: bid.vendorName,
+      departmentId: dept.id,
+      departmentName: dept.name,
+      awardAmount: bid.totalAmount,
+      remainingBudget: remaining,
+      reason: overrideReason.trim(),
+      requestedByUserId: currentUser.id,
+      requestedByName: currentUser.fullName,
+      status: 'Pending',
+      createdAt: new Date().toISOString(),
+    };
+    setBudgetOverrideRequests((prev) => [request, ...prev]);
+    addAuditLog('Budget Override Requested', tender.referenceNumber, `Remaining budget: ₦${remaining.toLocaleString()}`, `Requested award: ₦${bid.totalAmount.toLocaleString()}`, request.reason);
+    addNotification({
+      forRole: 'Finance Officer',
+      title: 'Budget Override Request',
+      message: `${currentUser.fullName} requests a budget override for ${tender.referenceNumber}. Finance approval is required before award.`,
+      type: 'warning',
+      recordType: 'tender',
+      recordId: tenderId,
+    });
+    addNotification({
+      forRole: 'Procurement Officer',
+      userId: currentUser.id,
+      title: 'Budget Override Sent to Finance',
+      message: `The override request for ${tender.referenceNumber} is pending Finance review. No award or PO has been created.`,
+      type: 'info',
+      recordType: 'tender',
+      recordId: tenderId,
+    });
+    return { requiresAuthority: false, blocked: 'Budget override request submitted to Finance. The award remains blocked until Finance approves it.' };
+  };
+
+  const decideBudgetOverride = (requestId: string, approved: boolean, comment: string) => {
+    const request = budgetOverrideRequests.find((entry) => entry.id === requestId);
+    if (!request || request.status !== 'Pending' || currentUser?.role !== 'Finance Officer' || !comment.trim()) return;
+    const status: BudgetOverrideRequest['status'] = approved ? 'Approved' : 'Rejected';
+    setBudgetOverrideRequests((prev) => prev.map((entry) => entry.id === requestId ? {
+      ...entry, status, financeComment: comment.trim(), decidedByUserId: currentUser.id,
+      decidedByName: currentUser.fullName, decidedAt: new Date().toISOString(),
+    } : entry));
+    addAuditLog(approved ? 'Budget Override Approved by Finance' : 'Budget Override Rejected by Finance',
+      request.tenderReference, 'Pending Finance Decision', status, comment.trim());
+    addNotification({
+      forRole: 'Procurement Officer',
+      userId: request.requestedByUserId,
+      title: approved ? 'Budget Override Approved' : 'Budget Override Rejected',
+      message: approved
+        ? `Finance approved the override for ${request.tenderReference}. Return to evaluation to continue the award; Authority sign-off still applies where required.`
+        : `Finance rejected the override for ${request.tenderReference}: ${comment.trim()}. The award remains blocked.`,
+      type: approved ? 'success' : 'danger',
+      recordType: 'tender',
+      recordId: request.tenderId,
+    });
   };
 
   // PO & Delivery Actions
@@ -1752,12 +1764,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const lateDays = isOnTime ? 0 : diffDays;
 
     // Cumulative accepted quantity per PO line (previous deliveries + this one; rejected goods never count)
-    const acceptedNow = po.items.map((it, idx) => {
-      const rec = itemsReceived[idx];
-      return rec && rec.status === 'Accepted' ? Math.max(0, rec.received) : 0;
-    });
-    const newReceived = po.items.map((it, idx) => Math.min(it.quantity, (it.receivedQuantity || 0) + acceptedNow[idx]));
-    const isFull = po.items.every((it, idx) => newReceived[idx] >= it.quantity);
+    const receipt = applyAcceptedDelivery(po.items, itemsReceived);
+    const acceptedNow = receipt.acceptedQuantities;
+    const newReceived = receipt.receivedQuantities;
+    const isFull = receipt.isFullyDelivered;
     if (acceptedNow.every((n) => n === 0)) return; // nothing accepted - nothing to record
 
     const newDelivery: DeliveryRecord = {
@@ -1805,13 +1815,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (v.id === po.vendorId) {
           const onTime = isOnTime ? v.onTimeDeliveries + 1 : v.onTimeDeliveries;
           const late = !isOnTime ? v.lateDeliveries + 1 : v.lateDeliveries;
-          const total = onTime + late;
-          const newScore = total > 0 ? Math.round((onTime / total) * 100) : v.reliabilityScore;
+          const rejected = v.rejections + itemsReceived.filter((item) => item.status === 'Rejected').length;
           return {
             ...v,
             onTimeDeliveries: onTime,
             lateDeliveries: late,
-            reliabilityScore: newScore,
+            rejections: rejected,
+            totalOrders: v.totalOrders + 1,
+            reliabilityScore: calculateReliabilityScore(onTime, late, rejected),
           };
         }
         return v;
@@ -1843,9 +1854,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const voucherNumber = nextRef('PV', payments.map((p) => p.voucherNumber));
     const po = purchaseOrders.find((p) => p.id === paymentData.purchaseOrderId);
     if (!po) return null;
-    if (!['Delivered', 'Partially Delivered'].includes(po.status)) return null; // pay only against received goods
-    const outstanding = po.totalAmount - po.paidAmount;
-    if (!(paymentData.amount > 0) || paymentData.amount > outstanding + 0.005) return null;
+    if (!canRecordPaymentRule(po, paymentData.amount)) return null;
 
     const newPayment: PaymentRecord = {
       ...paymentData,
@@ -1940,7 +1949,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       prev.map((v) => {
         if (v.id === vendorId) {
           const orgStatuses = { ...(v.organizationStatuses || {}) };
-          const previousStatus = orgStatuses[orgId]?.status || 'Approved';
+          const previousStatus = orgStatuses[orgId]?.status || v.status;
           orgStatuses[orgId] = {
             status,
             reason,
@@ -2118,6 +2127,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       budgetChanges,
       notifications,
       auditLogs,
+      budgetOverrideRequests,
     };
     return JSON.stringify(fullBackup, null, 2);
   };
@@ -2137,7 +2147,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (data.deliveries) setDeliveries(data.deliveries);
       if (data.payments) setPayments(data.payments);
       if (data.notifications) setNotifications(data.notifications);
-      if (data.auditLogs) setAuditLogs(data.auditLogs);
+      if (data.budgetOverrideRequests && Array.isArray(data.budgetOverrideRequests)) setBudgetOverrideRequests(data.budgetOverrideRequests);
+      if (data.auditLogs && Array.isArray(data.auditLogs)) setAuditLogs((existing) => mergeAuditLogAppendOnly(existing, data.auditLogs));
       return true;
     } catch {
       return false;
@@ -2152,6 +2163,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const staySignedIn = () => {
     setInactivityModalOpen(false);
   };
+
+  const visibleBids = bids.filter((bid) => canViewBid(
+    bid,
+    tenders.find((tender) => tender.id === bid.tenderId),
+    currentUser?.role,
+    currentUser?.vendorId,
+  ));
 
   return (
     <AppContext.Provider
@@ -2170,11 +2188,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         vendors,
         requests,
         tenders,
-        bids,
+        bids: visibleBids,
         purchaseOrders,
         deliveries,
         payments,
         budgetChanges,
+        budgetOverrideRequests,
         notifications,
         auditLogs,
         currentUser,
@@ -2208,6 +2227,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         awardTender,
         authorityApproveAward,
         overrideBudgetAndAward,
+        decideBudgetOverride,
         acknowledgePO,
         dispatchDelivery,
         receiveDelivery,
