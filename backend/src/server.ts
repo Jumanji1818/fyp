@@ -610,26 +610,40 @@ app.patch('/api/records/:recordId/transition', requireAuth, requireOrganization,
       'Pending Approval': [{ to: 'Approved', roles: ['Approving Authority','Organization Admin'] }, { to: 'Rejected', roles: ['Approving Authority','Organization Admin'] }],
     },
   };
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
+    await client.query('BEGIN');
+    const result = await client.query(
       'SELECT id,organization_id,record_type,status,data,created_by FROM procurement_records WHERE id = $1 AND organization_id = $2 FOR UPDATE',
       [recordId, req.user!.organizationId],
     );
-    if (!result.rowCount) return res.status(404).json({ error: 'Record not found in your organization.' });
+    if (!result.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Record not found in your organization.' });
+    }
     const record = result.rows[0];
     const possible = transitions[String(record.record_type)]?.[String(record.status)] || [];
     const transition = possible.find((item) => item.to === parsed.data.nextStatus && item.roles.includes(req.user!.role));
-    if (!transition) return res.status(403).json({ error: 'This status transition is not permitted for your role or the current record state.' });
-    const updated = await pool.query(
-      'UPDATE procurement_records SET status = $1, data = CASE WHEN $2::text IS NULL THEN data ELSE data || jsonb_build_object(\'transitionReason\',$2::text) END WHERE id = $3 AND organization_id = $4 RETURNING id,organization_id,record_type,reference_number,status,data,created_by,created_at,updated_at',
+    if (!transition) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'This status transition is not permitted for your role or the current record state.' });
+    }
+    const updated = await client.query(
+      "UPDATE procurement_records SET status = $1, data = CASE WHEN $2::text IS NULL THEN data ELSE data || jsonb_build_object('transitionReason',$2::text) END WHERE id = $3 AND organization_id = $4 RETURNING id,organization_id,record_type,reference_number,status,data,created_by,created_at,updated_at",
       [parsed.data.nextStatus, parsed.data.reason || null, recordId, req.user!.organizationId],
     );
-    await pool.query(
+    await client.query(
       'INSERT INTO audit_events(organization_id,actor_user_id,action,entity_type,entity_id,details) VALUES($1,$2,$3,$4,$5,$6)',
       [req.user!.organizationId, req.user!.id, 'record.status_changed', String(record.record_type), recordId, JSON.stringify({ from: record.status, to: parsed.data.nextStatus, reason: parsed.data.reason || null })],
     );
+    await client.query('COMMIT');
     return res.json({ record: updated.rows[0] });
-  } catch (error) { return next(error); }
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    return next(error);
+  } finally {
+    client.release();
+  }
 });
 
 app.use((_req, res) => res.status(404).json({ error: 'Endpoint not found.' }));
