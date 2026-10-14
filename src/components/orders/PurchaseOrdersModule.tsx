@@ -23,7 +23,7 @@ interface PurchaseOrdersModuleProps {
 }
 
 export const PurchaseOrdersModule: React.FC<PurchaseOrdersModuleProps> = ({ initialPoId }) => {
-  const { purchaseOrders, tenders, bids, currentUser, acknowledgePO, currentOrganization } = useApp();
+  const { purchaseOrders, tenders, bids, currentUser, acknowledgePO, cancelPurchaseOrder, currentOrganization } = useApp();
 
   const orgPOs = purchaseOrders.filter((po) =>
     po.organizationId ? po.organizationId === currentOrganization.id : currentOrganization.id === 'org-emerald'
@@ -179,6 +179,18 @@ export const PurchaseOrdersModule: React.FC<PurchaseOrdersModuleProps> = ({ init
                             className="px-2.5 py-1 rounded-lg bg-[#1F6F4A] hover:bg-[#2C9E62] text-white font-semibold flex items-center gap-1 text-[11px]"
                           >
                             <Check className="w-3 h-3" /> Acknowledge PO
+                          </button>
+                        )}
+                        {['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') && !['Delivered', 'Closed', 'Cancelled'].includes(po.status) && (
+                          <button
+                            onClick={() => {
+                              const reason = window.prompt(`Reason for cancelling ${po.referenceNumber}:`);
+                              if (reason?.trim()) cancelPurchaseOrder(po.id, reason.trim());
+                            }}
+                            className="rounded-lg border border-[#D9534F]/40 bg-[#D9534F]/10 px-2 py-1 text-[11px] font-semibold text-[#D9534F]"
+                            title="Cancel PO and release unpaid commitment"
+                          >
+                            Cancel PO
                           </button>
                         )}
                         <button
