@@ -252,7 +252,7 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({
             {currentTender.referenceNumber}: {currentTender.title}
           </h2>
           <p className="text-xs text-[#A8B5AB] mt-0.5">
-            Bids revealed: {tenderBids.length} sealed submissions. Weights: Price {currentTender.evaluationWeights.price}% · Delivery {currentTender.evaluationWeights.deliveryTime}% · Reliability {currentTender.evaluationWeights.vendorReliability}% · Tech {currentTender.evaluationWeights.technicalScore}%.
+            Bids revealed: {tenderBids.length} submissions. Weights: Price {currentTender.evaluationWeights.price}% · Delivery {currentTender.evaluationWeights.deliveryTime}% · Reliability {currentTender.evaluationWeights.vendorReliability}% · Tech {currentTender.evaluationWeights.technicalScore}%.
           </p>
         </div>
 
