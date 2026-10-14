@@ -101,13 +101,13 @@ export const ProcurementProcessWalkthroughModal: React.FC<WalkthroughModalProps>
     },
     {
       number: 4,
-      title: 'Sealed Vendor Bidding',
+      title: 'Confidential Vendor Bidding',
       tab: 'vendor_tenders',
       role: 'Registered Supplier / Contractor',
       icon: Building,
       description:
-        'Vendors submit sealed commercial bids, upload mandatory statutory compliance certificates (CAC, Tax Clearance, PenCom), and accept fraud prevention disclosures.',
-      statusText: `${bids.length} Total Bids submitted (Sealed)`,
+        'Vendors submit commercial bids that remain confidential until the closing time, upload mandatory statutory compliance certificates (CAC, Tax Clearance, PenCom), and accept fraud prevention disclosures.',
+      statusText: `${bids.length} Total Bids Submitted`,
       actionLabel: 'View Vendor Portal Bidding',
     },
     {

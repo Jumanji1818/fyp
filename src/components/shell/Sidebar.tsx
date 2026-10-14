@@ -128,6 +128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
         { id: 'payments', label: 'Payment Disbursements', icon: CreditCard },
         { id: 'vendors', label: 'Vendor Directory', icon: Building },
         { id: 'budgets', label: 'Operating Budgets', icon: PieChart },
+        { id: 'awards', label: 'Budget Override Requests', icon: Award },
         { id: 'reports', label: 'Reports & Analytics', icon: BarChart3 },
         { id: 'audit', label: 'Audit Log (Immutable)', icon: ShieldAlert },
         { id: 'settings', label: 'Business Settings', icon: SettingsIcon },
@@ -156,18 +157,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
 
   const navItems = getNavItems();
 
-  if (!menuOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex animate-in fade-in duration-200">
+    <div className={`fixed inset-0 z-50 ${menuOpen ? 'flex' : 'hidden'} animate-in fade-in duration-200 lg:static lg:inset-auto lg:z-auto lg:flex lg:h-full lg:w-72 lg:shrink-0 lg:animate-none`}>
       {/* Blurred Backdrop Screen Overlay (Section User Directive) */}
       <div
         onClick={() => setMenuOpen(false)}
-        className="fixed inset-0 bg-black/60 backdrop-blur-md transition-opacity"
+        className="fixed inset-0 bg-black/60 backdrop-blur-md transition-opacity lg:hidden"
       />
 
       {/* Slide-out Navigation Drawer */}
-      <aside className="relative z-50 w-72 max-w-[85vw] h-full bg-[#0D1F17] border-r border-[#1F3A2D] shadow-2xl flex flex-col justify-between overflow-hidden animate-in slide-in-from-left duration-250 font-sans">
+      <aside className="relative z-50 w-72 max-w-[85vw] h-full bg-[#0D1F17] border-r border-[#1F3A2D] shadow-2xl flex flex-col justify-between overflow-hidden animate-in slide-in-from-left duration-250 font-sans lg:w-full lg:max-w-none lg:shadow-none lg:animate-none">
         {/* Top Header / Logo */}
         <div>
           <div className="h-16 px-5 border-b border-[#1F3A2D] flex items-center justify-between bg-[#07130E]/50">
@@ -189,7 +188,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
 
             <button
               onClick={() => setMenuOpen(false)}
-              className="p-1.5 rounded-lg text-[#A8B5AB] hover:text-[#D4AF37] hover:bg-[#132A20] transition-colors"
+              className="p-1.5 rounded-lg text-[#A8B5AB] hover:text-[#D4AF37] hover:bg-[#132A20] transition-colors lg:hidden"
               title="Close navigation menu"
             >
               <X className="w-5 h-5" />

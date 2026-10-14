@@ -117,7 +117,7 @@ export const INITIAL_DEPARTMENTS: Department[] = [
     name: 'ICT & Telecommunications',
     annualBudget: 60000000,
     spent: 24800000,
-    committed: 14200000,
+    committed: 23800000, // Matches PO-2026-0002; reserved budget includes the full issued commitment.
   },
   {
     id: 'dept-admin',
@@ -1616,6 +1616,20 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     newValue: 'Status: Delivered (On-Time)',
     details: 'All items accepted without reservation after installation test.',
   },
+
+  {
+    id: 'aud-6',
+    organizationId: 'org-emerald',
+    timestamp: '2026-02-15T09:45:00Z',
+    userId: 'user-auth',
+    userName: 'Chief Babatunde Adeleke',
+    role: 'Approving Authority',
+    action: 'Award Approved by Authority',
+    recordReference: 'TND-2026-0002',
+    oldValue: 'Awaiting Authority Approval',
+    newValue: 'Approved for Award',
+    details: 'Award of ₦23,800,000 to PrimeTech Systems & Digital Ltd authorized before PO-2026-0002 was issued (exceeded ₦5M threshold).',
+  },
   {
     id: 'aud-3',
     organizationId: 'org-emerald',
@@ -1628,8 +1642,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     oldValue: 'Awaiting Authority Approval',
     newValue: 'Approved for Award',
     details: 'Award of ₦27,750,000 to Apex Engineering authorized (exceeded ₦5M threshold).',
-  },
-  {
+  },  {
     id: 'aud-4',
     organizationId: 'org-emerald',
     timestamp: '2026-02-05T18:00:00Z',

@@ -1,0 +1,74 @@
+name: Defense Readiness Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'electron/**'
+      - 'tools/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'index.html'
+      - 'vite.config.ts'
+      - 'DESKTOP.md'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Desktop build
+        run: npm run build:desktop
+
+      - name: Electron role and screen audit
+        run: xvfb-run -a npx electron tools/audit-main.cjs --no-sandbox
+
+      - name: Build E2E-instrumented renderer
+        run: VITE_E2E=1 npm run build:desktop
+
+      - name: Budget override, Authority, cancellation, and sole-proprietor workflow
+        run: xvfb-run -a npx electron tools/budget-override-e2e.cjs --no-sandbox
+
+      - name: Award workflow end-to-end test
+        run: xvfb-run -a npx electron tools/award-e2e.cjs --no-sandbox
+
+      - name: PDF output test
+        env:
+          PROCURA_TEST_PDF: /tmp/procura-test.pdf
+        run: xvfb-run -a npx electron tools/pdf-test.cjs --no-sandbox
+
+      - name: Authentication end-to-end test
+        run: |
+          VITE_E2E=1 npm run build:desktop
+          xvfb-run -a npx electron tools/auth-e2e.cjs --no-sandbox
+
+      - name: SQLite persistence test
+        env:
+          PROCURA_DB: /tmp/procura-persist.db
+        run: |
+          rm -f "$PROCURA_DB"
+          xvfb-run -a npx electron tools/persist-test.cjs run1 --no-sandbox
+          xvfb-run -a npx electron tools/persist-test.cjs run2 --no-sandbox

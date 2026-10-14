@@ -433,3 +433,26 @@ export interface OrganizationSettings {
   };
   dailyBackupEnabled: boolean;
 }
+
+
+export interface BudgetOverrideRequest {
+  id: string;
+  organizationId: string;
+  tenderId: string;
+  tenderReference: string;
+  bidId: string;
+  vendorName: string;
+  departmentId: string;
+  departmentName: string;
+  awardAmount: number;
+  remainingBudget: number;
+  reason: string;
+  requestedByUserId: string;
+  requestedByName: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  financeComment?: string;
+  decidedByUserId?: string;
+  decidedByName?: string;
+  decidedAt?: string;
+  createdAt: string;
+}

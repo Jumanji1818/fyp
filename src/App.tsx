@@ -31,6 +31,7 @@ import { StoreReceivingModule } from './components/deliveries/StoreReceivingModu
 import { PaymentsModule } from './components/payments/PaymentsModule';
 import { VendorsDirectoryModule } from './components/vendors_directory/VendorsDirectoryModule';
 import { BudgetsModule } from './components/budgets/BudgetsModule';
+import { BudgetOverrideRequestsModule } from './components/budgets/BudgetOverrideRequestsModule';
 import { ReportsModule } from './components/reports/ReportsModule';
 import { UserManagementModule } from './components/admin/UserManagementModule';
 import { CategoriesModule } from './components/admin/CategoriesModule';
@@ -40,6 +41,7 @@ import { SettingsModule } from './components/settings/SettingsModule';
 const MainApp: React.FC = () => {
   const {
     currentUser,
+    currentOrganization,
     isAuthenticated,
     toggleTheme,
     settings,
@@ -244,9 +246,11 @@ const MainApp: React.FC = () => {
                   />
                 )}
 
+                {currentTab === 'awards' && (currentUser?.role === 'Finance Officer' || (currentOrganization.type === 'sole_proprietorship' && currentUser?.role === 'Organization Admin')) && <BudgetOverrideRequestsModule />}
+
                 {currentTab === 'awards' && currentUser?.role === 'Approving Authority' && <AuthorityApprovalsModule />}
 
-                {currentTab === 'awards' && currentUser?.role !== 'Approving Authority' && (
+                {currentTab === 'awards' && currentUser?.role !== 'Approving Authority' && currentUser?.role !== 'Finance Officer' && !(currentOrganization.type === 'sole_proprietorship' && currentUser?.role === 'Organization Admin') && (
                   <EvaluationModule
                     initialTenderId={navItemId}
                     onNavigateToPO={(poId) => handleNavigate('orders', poId)}

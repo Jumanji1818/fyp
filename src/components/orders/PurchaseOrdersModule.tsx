@@ -23,7 +23,7 @@ interface PurchaseOrdersModuleProps {
 }
 
 export const PurchaseOrdersModule: React.FC<PurchaseOrdersModuleProps> = ({ initialPoId }) => {
-  const { purchaseOrders, tenders, bids, currentUser, acknowledgePO, currentOrganization } = useApp();
+  const { purchaseOrders, tenders, bids, currentUser, acknowledgePO, cancelPurchaseOrder, currentOrganization } = useApp();
 
   const orgPOs = purchaseOrders.filter((po) =>
     po.organizationId ? po.organizationId === currentOrganization.id : currentOrganization.id === 'org-emerald'
@@ -181,6 +181,18 @@ export const PurchaseOrdersModule: React.FC<PurchaseOrdersModuleProps> = ({ init
                             <Check className="w-3 h-3" /> Acknowledge PO
                           </button>
                         )}
+                        {['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') && !['Delivered', 'Closed', 'Cancelled'].includes(po.status) && (
+                          <button
+                            onClick={() => {
+                              const reason = window.prompt(`Reason for cancelling ${po.referenceNumber}:`);
+                              if (reason?.trim()) cancelPurchaseOrder(po.id, reason.trim());
+                            }}
+                            className="rounded-lg border border-[#D9534F]/40 bg-[#D9534F]/10 px-2 py-1 text-[11px] font-semibold text-[#D9534F]"
+                            title="Cancel PO and release unpaid commitment"
+                          >
+                            Cancel PO
+                          </button>
+                        )}
                         <button
                           onClick={() => openAwardLetterForPO(po)}
                           className="p-1.5 rounded-lg bg-[#132A20] hover:bg-[#1F3A2D] text-[#D4AF37] border border-[#D4AF37]/40"
@@ -191,7 +203,7 @@ export const PurchaseOrdersModule: React.FC<PurchaseOrdersModuleProps> = ({ init
                         <button
                           onClick={() => openPrintPO(po)}
                           className="p-1.5 rounded-lg bg-[#132A20] hover:bg-[#1F3A2D] text-[#D4AF37] border border-[#1F3A2D]"
-                          title="Print / Save PO (Green & Gold Template)"
+                          title="Print / Save PDF (Green & Gold Template)"
                         >
                           <Printer className="w-3.5 h-3.5" />
                         </button>
@@ -292,7 +304,7 @@ export const PurchaseOrdersModule: React.FC<PurchaseOrdersModuleProps> = ({ init
                   onClick={() => openPrintPO(selectedPO)}
                   className="px-4 py-2 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] font-semibold text-xs flex items-center gap-1.5 hover:brightness-110 shadow"
                 >
-                  <Printer className="w-3.5 h-3.5 text-[#D4AF37]" /> Print / Save PO
+                  <Printer className="w-3.5 h-3.5 text-[#D4AF37]" /> Print / Save PDF
                 </button>
               </div>
 

@@ -38,6 +38,7 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({
     tenders,
     bids,
     vendors,
+    budgetOverrideRequests,
     departments,
     purchaseOrders,
     currentUser,
@@ -137,8 +138,11 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({
     if (!canAwardContract) return;
     if (isAlreadyAwarded || isAwarding || currentTender?.awaitingAuthorityApproval) return;
 
-    if (bid.totalAmount > deptRemainingBudget) {
-      // Blocked by budget cap! Trigger Finance Override flow (Section 6.6)
+    const financeOverrideApproved = budgetOverrideRequests.some((request) =>
+      request.tenderId === currentTender?.id && request.bidId === bid.id && request.status === 'Approved'
+    );
+    if (bid.totalAmount > deptRemainingBudget && !financeOverrideApproved) {
+      // A reason only submits a request; Finance must approve it before the award can continue.
       setSelectedWinnerBidId(bid.id);
       setBudgetOverrideModalOpen(true);
       return;
@@ -248,7 +252,7 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({
             {currentTender.referenceNumber}: {currentTender.title}
           </h2>
           <p className="text-xs text-[#A8B5AB] mt-0.5">
-            Bids revealed: {tenderBids.length} sealed submissions. Weights: Price {currentTender.evaluationWeights.price}% · Delivery {currentTender.evaluationWeights.deliveryTime}% · Reliability {currentTender.evaluationWeights.vendorReliability}% · Tech {currentTender.evaluationWeights.technicalScore}%.
+            Bids revealed: {tenderBids.length} submissions. Weights: Price {currentTender.evaluationWeights.price}% · Delivery {currentTender.evaluationWeights.deliveryTime}% · Reliability {currentTender.evaluationWeights.vendorReliability}% · Tech {currentTender.evaluationWeights.technicalScore}%.
           </p>
         </div>
 

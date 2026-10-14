@@ -18,6 +18,7 @@ import { useApp } from '../../context/AppContext';
 import { StatusChip } from '../common/StatusChip';
 import { Modal } from '../common/Modal';
 import { VendorProfile } from '../../types';
+import { isSoloOwnerFlow } from '../../utils/procurementRules';
 
 export const VendorsDirectoryModule: React.FC = () => {
   const {
@@ -26,6 +27,7 @@ export const VendorsDirectoryModule: React.FC = () => {
     updateVendorStatus,
     getVendorEffectiveStatus,
     currentOrganization,
+    currentUser,
     bids,
     purchaseOrders,
     categories,
@@ -37,6 +39,7 @@ export const VendorsDirectoryModule: React.FC = () => {
   const [activeVendorId, setActiveVendorId] = useState<string | null>(null);
 
   const activeVendor = vendors.find((v) => v.id === activeVendorId) || null;
+  const canManageVendors = currentUser?.role === 'Procurement Officer' || isSoloOwnerFlow(currentOrganization.type, currentUser?.organizationId, currentOrganization.id);
   const activeEffectiveStatus = activeVendor ? getVendorEffectiveStatus(activeVendor) : { status: 'Approved' };
 
   // Suspend modal
@@ -65,6 +68,13 @@ export const VendorsDirectoryModule: React.FC = () => {
     setSuspendModalOpen(false);
     setSuspendReason('');
     setActionFeedback(`Vendor suspended for ${currentOrganization.name}.`);
+    setTimeout(() => setActionFeedback(null), 3000);
+  };
+
+  const handleApproveVendor = () => {
+    if (!activeVendor) return;
+    updateVendorStatus(activeVendor.id, 'Approved', `Approved by Procurement for ${currentOrganization.name}`);
+    setActionFeedback(`Vendor approved for ${currentOrganization.name}.`);
     setTimeout(() => setActionFeedback(null), 3000);
   };
 
@@ -182,6 +192,7 @@ export const VendorsDirectoryModule: React.FC = () => {
 
             <div className="mt-5 pt-3 border-t border-[#1F3A2D] flex items-center justify-between text-xs" onClick={(e) => e.stopPropagation()}>
               {/* My Vendors Toggle (Section 7.2: "A vendor can be added to My Vendors or removed") */}
+              {canManageVendors && (
               <button
                 onClick={() => toggleMyVendor(vendor.id)}
                 className={`px-3 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
@@ -193,6 +204,7 @@ export const VendorsDirectoryModule: React.FC = () => {
                 <ShieldCheck className="w-3.5 h-3.5" />
                 {vendor.inMyVendors ? 'In My Vendors' : 'Add to My Vendors'}
               </button>
+              )}
 
               <button
                 onClick={() => setActiveVendorId(vendor.id)}
@@ -290,22 +302,29 @@ export const VendorsDirectoryModule: React.FC = () => {
 
             {/* Vendor Management Actions: Suspend / Blacklist / Reinstate (Section 7.2) */}
             <div className="flex items-center justify-between pt-3 border-t border-[#1F3A2D]">
-              <div className="flex gap-2">
-                {activeEffectiveStatus.status !== 'Suspended' ? (
+              {canManageVendors && <div className="flex gap-2">
+                {activeEffectiveStatus.status === 'Registered' ? (
                   <button
-                    onClick={() => setSuspendModalOpen(true)}
-                    className="px-3.5 py-1.5 rounded-lg bg-[#E0A93B]/20 text-[#E0A93B] border border-[#E0A93B]/40 hover:bg-[#E0A93B]/30 font-semibold transition-all active:scale-95"
+                    onClick={handleApproveVendor}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#3FB67A]/20 text-[#3FB67A] border border-[#3FB67A]/40 hover:bg-[#3FB67A]/30 font-semibold transition-all active:scale-95"
                   >
-                    Suspend for {currentOrganization.name}
+                    Approve Vendor
                   </button>
-                ) : (
+                ) : activeEffectiveStatus.status === 'Suspended' ? (
                   <button
                     onClick={handleReinstate}
                     className="px-3.5 py-1.5 rounded-lg bg-[#3FB67A]/20 text-[#3FB67A] border border-[#3FB67A]/40 hover:bg-[#3FB67A]/30 font-semibold transition-all active:scale-95"
                   >
                     Reinstate for {currentOrganization.name}
                   </button>
-                )}
+                ) : activeEffectiveStatus.status === 'Approved' ? (
+                  <button
+                    onClick={() => setSuspendModalOpen(true)}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#E0A93B]/20 text-[#E0A93B] border border-[#E0A93B]/40 hover:bg-[#E0A93B]/30 font-semibold transition-all active:scale-95"
+                  >
+                    Suspend for {currentOrganization.name}
+                  </button>
+                ) : null}
 
                 {activeEffectiveStatus.status !== 'Blacklisted' ? (
                   <button
@@ -322,7 +341,7 @@ export const VendorsDirectoryModule: React.FC = () => {
                     Remove from Blacklist
                   </button>
                 )}
-              </div>
+              </div>}
 
               <button
                 onClick={() => setActiveVendorId(null)}

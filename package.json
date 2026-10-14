@@ -13,11 +13,14 @@
     "cap:build": "npm run build && npx cap sync android",
     "build:desktop": "cross-env ELECTRON=1 vite build",
     "desktop": "npm run build:desktop && electron .",
-    "dist:win": "npm run build:desktop && electron-builder --win --publish never"
+    "dist:win": "npm run build:desktop && electron-builder --win --publish never",
+    "test": "vitest run"
   },
   "dependencies": {
     "@noble/hashes": "^1.8.0",
-    "electron-updater": "^6.3.9"
+    "electron-updater": "^6.3.9",
+    "@fontsource-variable/fraunces": "^5.2.6",
+    "@fontsource-variable/manrope": "^5.2.6"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.3",
@@ -42,7 +45,8 @@
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
-    "vite-plugin-pwa": "^2.0.0"
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^4.0.0"
   },
   "description": "Procura - Smart Procurement System (desktop)",
   "author": "Abdulhameed Abdulsalam",

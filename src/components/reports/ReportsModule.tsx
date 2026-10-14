@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { PrintViewModal, DocumentData } from '../common/PrintViewModal';
+import { serializeCsv, spendAnalysisRows, vendorPerformanceRows, deliveryPerformanceRows, tenderSummaryRows, budgetUtilizationRows, outstandingPaymentRows } from '../../utils/reporting';
 
 type ReportType =
   | 'spend_analysis'
@@ -43,11 +44,13 @@ export const ReportsModule: React.FC = () => {
     orgPOs.some((po) => po.id === d.purchaseOrderId || po.referenceNumber === d.poReference)
   );
 
-  // Helper to trigger CSV download
+  const orgVendors = vendors.filter((vendor) =>
+    !!vendor.organizationStatuses?.[currentOrganization.id] || orgPOs.some((po) => po.vendorId === vendor.id)
+  );
+
+  // CSV exports are generated from the same organization-scoped records displayed in the report.
   const downloadCSV = (filename: string, rows: string[][]) => {
-    const csvContent =
-      'data:text/csv;charset=utf-8,' + rows.map((e) => e.map((val) => `"${val}"`).join(',')).join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(serializeCsv(rows));
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
     link.setAttribute('download', `${filename}.csv`);
@@ -58,56 +61,17 @@ export const ReportsModule: React.FC = () => {
 
   const handleExportCSV = () => {
     if (activeReport === 'spend_analysis') {
-      const rows = [
-        ['Payment Voucher', 'PO Reference', 'Vendor Name', 'Department', 'Amount (NGN)', 'Payment Date'],
-        ...orgPayments.map((p) => [
-          p.voucherNumber,
-          p.poReference,
-          p.vendorName,
-          p.departmentName,
-          p.amount.toString(),
-          p.paymentDate,
-        ]),
-      ];
-      downloadCSV(`Procura_Spend_Analysis_${currentOrganization.name.replace(/\s+/g, '_')}`, rows);
+      downloadCSV(`Procura_Spend_Analysis_${currentOrganization.name.replace(/\s+/g, '_')}`, spendAnalysisRows(orgPayments));
     } else if (activeReport === 'vendor_performance') {
-      const rows = [
-        ['Vendor Business Name', 'CAC Number', 'Reliability Score (%)', 'Total Orders', 'On Time Deliveries', 'Late Deliveries'],
-        ...vendors.map((v) => [
-          v.businessName,
-          v.cacNumber,
-          v.reliabilityScore.toString(),
-          v.totalOrders.toString(),
-          v.onTimeDeliveries.toString(),
-          v.lateDeliveries.toString(),
-        ]),
-      ];
-      downloadCSV('Procura_Vendor_Performance_Report', rows);
+      downloadCSV(`Procura_Vendor_Performance_${currentOrganization.name.replace(/\s+/g, '_')}`, vendorPerformanceRows(orgVendors));
     } else if (activeReport === 'delivery_performance') {
-      const rows = [
-        ['PO Reference', 'Vendor', 'Received By', 'Delivery Date', 'Timeliness', 'Late Days'],
-        ...orgDeliveries.map((d) => [
-          d.poReference,
-          d.vendorName,
-          d.receivedByName,
-          d.receivedDate,
-          d.onTime ? 'On Time' : 'Late',
-          d.lateDays.toString(),
-        ]),
-      ];
-      downloadCSV(`Procura_Delivery_Performance_${currentOrganization.name.replace(/\s+/g, '_')}`, rows);
+      downloadCSV(`Procura_Delivery_Performance_${currentOrganization.name.replace(/\s+/g, '_')}`, deliveryPerformanceRows(orgDeliveries));
+    } else if (activeReport === 'tender_summary') {
+      downloadCSV(`Procura_Tender_Summary_${currentOrganization.name.replace(/\s+/g, '_')}`, tenderSummaryRows(orgTenders));
+    } else if (activeReport === 'outstanding_payments') {
+      downloadCSV(`Procura_Outstanding_Payments_${currentOrganization.name.replace(/\s+/g, '_')}`, outstandingPaymentRows(orgPOs));
     } else {
-      const rows = [
-        ['Department', 'Annual Budget (NGN)', 'Disbursed Spent (NGN)', 'Committed (NGN)', 'Remaining (NGN)'],
-        ...orgDepts.map((d) => [
-          d.name,
-          d.annualBudget.toString(),
-          d.spent.toString(),
-          d.committed.toString(),
-          (d.annualBudget - d.spent - d.committed).toString(),
-        ]),
-      ];
-      downloadCSV(`Procura_Budget_Utilization_${currentOrganization.name.replace(/\s+/g, '_')}`, rows);
+      downloadCSV(`Procura_Budget_Utilization_${currentOrganization.name.replace(/\s+/g, '_')}`, budgetUtilizationRows(orgDepts));
     }
   };
 
@@ -123,7 +87,7 @@ export const ReportsModule: React.FC = () => {
         { label: 'Organization Entity', value: currentOrganization.name },
         { label: 'Report Category', value: activeReport.replace(/_/g, ' ') },
         { label: 'Fiscal Currency', value: 'Nigerian Naira (NGN ₦)' },
-        { label: 'Audit Checksum', value: 'VERIFIED-ENTERPRISE' },
+        { label: 'Records Included', value: activeReport === 'spend_analysis' ? String(orgPayments.length) : activeReport === 'tender_summary' ? String(orgTenders.length) : activeReport === 'delivery_performance' ? String(orgDeliveries.length) : activeReport === 'budget_utilization' ? String(orgDepts.length) : activeReport === 'outstanding_payments' ? String(orgPOs.filter((po) => ['Delivered', 'Partially Delivered'].includes(po.status) && po.paidAmount < po.totalAmount).length) : String(orgVendors.length) },
       ],
     });
   };
@@ -240,7 +204,7 @@ export const ReportsModule: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1F3A2D]">
-                  {vendors.map((v) => (
+                  {orgVendors.map((v) => (
                     <tr key={v.id}>
                       <td className="py-2.5 px-3 font-semibold text-[#F2EFE6]">{v.businessName}</td>
                       <td className="py-2.5 px-3 font-mono text-[#A8B5AB]">{v.cacNumber}</td>
@@ -319,7 +283,7 @@ export const ReportsModule: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-[#1F3A2D]">
                   {purchaseOrders
-                    .filter((po) => po.paidAmount < po.totalAmount)
+                    .filter((po) => ['Delivered', 'Partially Delivered'].includes(po.status) && po.paidAmount < po.totalAmount)
                     .map((po) => (
                       <tr key={po.id}>
                         <td className="py-2.5 px-3 font-mono font-bold text-[#E8CF7A]">{po.referenceNumber}</td>

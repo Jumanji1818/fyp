@@ -94,9 +94,10 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   // User-relevant notifications
   const userNotifs = notifications.filter((n) => {
-    if (n.userId && currentUser?.id) return n.userId === currentUser.id;
+    if (n.userId) return n.userId === currentUser?.id;
+    if (n.organizationId && n.organizationId !== currentOrganization.id) return false;
     if (n.forRole && currentUser?.role) return n.forRole === currentUser.role;
-    return true;
+    return !n.organizationId || n.organizationId === currentOrganization.id;
   });
 
   const unreadCount = userNotifs.filter((n) => !n.read).length;
@@ -110,7 +111,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink">
         <button
           onClick={toggleMenu}
-          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#0D1F17] hover:bg-[#132A20] text-[#D4AF37] border border-[#1F3A2D] text-xs font-semibold shadow-sm transition-all active:scale-95 shrink-0"
+          className="flex lg:hidden items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#0D1F17] hover:bg-[#132A20] text-[#D4AF37] border border-[#1F3A2D] text-xs font-semibold shadow-sm transition-all active:scale-95 shrink-0"
           title="Open Navigation Menu"
         >
           <Menu className="w-4 h-4 text-[#D4AF37]" />

@@ -37,6 +37,7 @@ export const RequestsModule: React.FC<RequestsModuleProps> = ({ initialSelectedI
     approveRequest,
     returnRequest,
     rejectRequest,
+    cancelRequest,
   } = useApp();
 
   const orgDepts = departments.filter((d) =>
@@ -354,6 +355,19 @@ export const RequestsModule: React.FC<RequestsModuleProps> = ({ initialSelectedI
                           >
                             <CheckCircle className="w-3.5 h-3.5" />
                             <span>Approve</span>
+                          </button>
+                        )}
+                        {req.status !== 'Cancelled' && req.status !== 'Converted to Tender' && (req.requesterId === currentUser?.id || isAdmin || isDeptHead) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const reason = window.prompt(`Reason for cancelling ${req.referenceNumber}:`);
+                              if (reason?.trim()) cancelRequest(req.id, reason.trim());
+                            }}
+                            title="Cancel Purchase Request"
+                            className="p-1.5 rounded-lg bg-[#D9534F]/10 hover:bg-[#D9534F]/20 text-[#D9534F] border border-[#D9534F]/30"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
                         {req.status === 'Approved by Department' && onNavigateTab && (isAdmin || isSole || currentUser?.role === 'Procurement Officer') && (
