@@ -73,6 +73,7 @@ export const procuraApi = {
   login: (email: string, password: string) =>
     request<{ user: ApiUser }>('/api/auth/login', { method: 'POST', body: { email, password } }),
   currentUser: () => request<{ user: ApiUser }>('/api/auth/me'),
+  currentOrganization: () => request<{ organization: Record<string, unknown> }>('/api/organizations/current'),
   logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
   changePassword: (currentPassword: string, newPassword: string) =>
     request<{ success: boolean }>('/api/auth/change-password', {
