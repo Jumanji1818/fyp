@@ -1,0 +1,33 @@
+  • electron-builder  version=25.1.8 os=10.0.26100
+  • loaded configuration  file=package.json ("build" field)
+  • executing @electron/rebuild  electronVersion=37.10.3 arch=x64 buildFromSource=false appDir=./
+  • installing native dependencies  arch=x64
+  • completed installing native dependencies
+  • packaging       platform=win32 arch=x64 electron=37.10.3 appOutDir=release\win-unpacked
+  • downloading     url=https://github.com/electron/electron/releases/download/v37.10.3/electron-v37.10.3-win32-x64.zip size=134 MB parts=8
+  • downloaded      url=https://github.com/electron/electron/releases/download/v37.10.3/electron-v37.10.3-win32-x64.zip duration=644ms
+  • updating asar integrity executable resource  executablePath=release\win-unpacked\Procura.exe
+  • downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z size=5.6 MB parts=1
+  • downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z duration=347ms
+  • signing with signtool.exe  path=release\win-unpacked\Procura.exe
+  • no signing info identified, signing is skipped  signHook=false cscInfo=null
+  • building        target=nsis file=release\Procura-Setup-1.0.9.exe archs=x64 oneClick=false perMachine=false
+  • downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/nsis-3.0.4.1/nsis-3.0.4.1.7z size=1.3 MB parts=1
+  • downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/nsis-3.0.4.1/nsis-3.0.4.1.7z duration=328ms
+  • signing with signtool.exe  path=release\win-unpacked\resources\elevate.exe
+  • no signing info identified, signing is skipped  signHook=false cscInfo=null
+  • downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/nsis-resources-3.4.1/nsis-resources-3.4.1.7z size=731 kB parts=1
+  • downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/nsis-resources-3.4.1/nsis-resources-3.4.1.7z duration=417ms
+  • signing with signtool.exe  path=release\__uninstaller-nsis-procura.exe
+  • no signing info identified, signing is skipped  signHook=false cscInfo=null
+  • signing with signtool.exe  path=release\Procura-Setup-1.0.9.exe
+  • no signing info identified, signing is skipped  signHook=false cscInfo=null
+  • building block map  blockMapFile=release\Procura-Setup-1.0.9.exe.blockmap
+  • building        target=portable file=release\Procura-Portable-1.0.9.exe archs=x64
+  • publishing      publisher=Github (owner: Jumanji1818, project: fyp, version: 1.0.9)
+  • uploading       file=Procura-Setup-1.0.9.exe.blockmap provider=github
+  • uploading       file=Procura-Setup-1.0.9.exe provider=github
+  • creating GitHub release  reason=release doesn't exist tag=v1.0.9 version=1.0.9
+  • signing with signtool.exe  path=release\Procura-Portable-1.0.9.exe
+  • no signing info identified, signing is skipped  signHook=false cscInfo=null
+  • uploading       file=Procura-Portable-1.0.9.exe provider=github

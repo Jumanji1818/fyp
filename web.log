@@ -1,0 +1,22 @@
+
+> procura@1.0.9 build:desktop
+> cross-env ELECTRON=1 vite build
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vite.config.ts:89:27). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+[36mvite v8.3.4 [32mbuilding client environment for production...[36m[39m
+transforming...
+✓ 1716 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   2.10 kB │ gzip:   0.82 kB
+dist/assets/index-DqZICwL6.css   62.53 kB │ gzip:  10.95 kB
+dist/assets/index-DeBD-Urt.js   760.13 kB │ gzip: 176.07 kB
+
+[32m✓ built in 533ms[39m
+[33m[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
