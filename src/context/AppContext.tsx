@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { appStorage } from '../utils/storage';
 import { createPasswordRecord, verifyPassword, validatePassword, generateTempPassword, normalizeAnswer, LoginLockout } from '../utils/password';
-import { BID_EVALUATOR_ROLES, canViewBid, canCommitBudget, approvalRequiresAuthority, canRecordPayment as canRecordPaymentRule, applyAcceptedDelivery, calculateReliabilityScore, calculateWeightedScores, resolveBudgetOverride, canVendorBid, remainingCommitmentAfterCancellation, isSoloOwnerFlow } from '../utils/procurementRules';
+import { BID_EVALUATOR_ROLES, canViewBid, canCommitBudget, approvalRequiresAuthority, canRecordPayment as canRecordPaymentRule, applyAcceptedDelivery, calculateReliabilityScore, calculateWeightedScores, resolveBudgetOverride, appendAuditEntry, canVendorBid, remainingCommitmentAfterCancellation, isSoloOwnerFlow } from '../utils/procurementRules';
 import {
   Organization,
   OrganizationType,
@@ -455,7 +455,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         newValue,
         details,
       };
-      setAuditLogs((prev) => [newEntry, ...prev]);
+      setAuditLogs((prev) => appendAuditEntry(prev, newEntry));
     },
     [currentUser, currentOrganization?.id]
   );
