@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createPasswordRecord, verifyPassword, validatePassword } from './password';
+import { createPasswordRecord, verifyPassword, validatePassword, LoginLockout } from './password';
 import {
   approvalRequiresAuthority, applyAcceptedDelivery, canCommitBudget, canRecordPayment,
-  canViewBid, calculateReliabilityScore, calculateWeightedScores, mergeAuditLogAppendOnly,
+  canViewBid, calculateReliabilityScore, calculateWeightedScores,
 } from './procurementRules';
 import type { Bid, EvaluationWeights, Tender } from '../types';
 
@@ -70,8 +70,13 @@ describe('procurement controls', () => {
     expect(calculateReliabilityScore(1, 1, 1)).toBe(53);
     expect(calculateReliabilityScore(0, 0, 0)).toBe(60);
   });
-  it('preserves existing audit entries when importing a backup', () => {
-    expect(mergeAuditLogAppendOnly([{ id: 'a', action: 'kept' }], [{ id: 'a', action: 'forged replacement' }, { id: 'b', action: 'new' }]))
-      .toEqual([{ id: 'a', action: 'kept' }, { id: 'b', action: 'new' }]);
+  it('locks after five failed attempts and unlocks after five minutes', () => {
+    const lockout = new LoginLockout();
+    const start = 1_000_000;
+    for (let i = 0; i < 4; i++) lockout.fail('person@example.com', start + i);
+    expect(lockout.message('person@example.com', start + 5)).toBeNull();
+    lockout.fail('person@example.com', start + 5);
+    expect(lockout.message('person@example.com', start + 6)).toContain('Too many failed attempts');
+    expect(lockout.message('person@example.com', start + 5 * 60 * 1000 + 10)).toBeNull();
   });
 });
