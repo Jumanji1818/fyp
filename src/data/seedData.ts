@@ -259,7 +259,10 @@ export const INITIAL_CATEGORIES: Category[] = [
   },
 ];
 
-export const INITIAL_USERS: User[] = [
+// Demo accounts all share the documented demo password "Procura@2026" (stored as a PBKDF2 hash, never in plain text).
+const DEMO_SALT = 'ERgfJi00O0JJUFdeZWxzeg==';
+const DEMO_HASH = 'Pv5XfvDY6pPhDHXMNCpnJBFFyTHo3VL9laV9YK1M5O0=';
+const RAW_USERS: User[] = [
   // Emerald Court Estates Users
   {
     id: 'user-admin',
@@ -428,6 +431,9 @@ export const INITIAL_USERS: User[] = [
     createdAt: '2026-02-04T11:00:00Z',
   },
 ];
+
+export const INITIAL_USERS: User[] = RAW_USERS.map((u) => ({ ...u, passwordSalt: DEMO_SALT, passwordHash: DEMO_HASH }));
+
 
 export const INITIAL_VENDORS: VendorProfile[] = [
   {

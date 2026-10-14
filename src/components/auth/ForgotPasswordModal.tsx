@@ -9,7 +9,7 @@ interface ForgotPasswordModalProps {
 }
 
 export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen, onClose }) => {
-  const { users, addAuditLog } = useApp();
+  const { users, resetPasswordWithAnswer } = useApp();
   const [email, setEmail] = useState('');
   const [step, setStep] = useState<'verify' | 'new_password' | 'done'>('verify');
   const [matchedUser, setMatchedUser] = useState<any>(null);
@@ -26,6 +26,10 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
       setError('No account found with this email address.');
       return;
     }
+    if (!user.securityQuestion) {
+      setError('Password recovery is not set up for this account. Ask your Organization Administrator to reset it.');
+      return;
+    }
     setMatchedUser(user);
     setStep('new_password');
   };
@@ -34,22 +38,16 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
     e.preventDefault();
     setError('');
 
-    if (matchedUser?.securityAnswer && answer.toLowerCase().trim() !== matchedUser.securityAnswer.toLowerCase().trim()) {
-      setError('Incorrect answer to security question.');
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
-
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match.');
       return;
     }
 
-    addAuditLog('Offline Password Reset', matchedUser.email, undefined, 'Password Updated', 'Reset via security question.');
+    const result = resetPasswordWithAnswer(matchedUser.email, answer, newPassword);
+    if (!result.success) {
+      setError(result.error || 'Unable to reset password.');
+      return;
+    }
     setStep('done');
   };
 

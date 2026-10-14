@@ -54,8 +54,8 @@ export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPhone, setAdminPhone] = useState('');
-  const [password, setPassword] = useState('Procura@2026');
-  const [confirmPassword, setConfirmPassword] = useState('Procura@2026');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const addDepartment = () => {
     if (!newDeptName.trim()) return;

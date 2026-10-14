@@ -1,3 +1,4 @@
+import { INITIAL_USERS } from '../../data/seedData';
 import React, { useState, useEffect } from 'react';
 import {
   Eye,
@@ -331,7 +332,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
         </form>
 
         {/* Selected Organization Quick-Fill Account helper */}
-        {orgAdmin && (
+        {orgAdmin && INITIAL_USERS.some((u) => u.id === orgAdmin.id) && (
           <div className="mt-4 p-2.5 rounded-xl bg-[#07130E]/70 border border-[#1F3A2D] flex items-center justify-between text-xs">
             <div className="truncate pr-2">
               <span className="text-[10px] text-[#A8B5AB] block">

@@ -1,3 +1,4 @@
+import { generateTempPassword } from '../../utils/password';
 import React, { useState } from 'react';
 import {
   Users,
@@ -45,7 +46,7 @@ export const UserManagementModule: React.FC = () => {
   const [provPhone, setProvPhone] = useState('');
   const [provRole, setProvRole] = useState<UserRole>('Request Officer');
   const [provDeptId, setProvDeptId] = useState('');
-  const [provTempPassword, setProvTempPassword] = useState(() => `Procura#${Math.floor(1000 + Math.random() * 9000)}`);
+  const [provTempPassword, setProvTempPassword] = useState(() => generateTempPassword());
   const [provRequireChange, setProvRequireChange] = useState(true);
   const [provError, setProvError] = useState('');
 
@@ -106,7 +107,7 @@ export const UserManagementModule: React.FC = () => {
     setProvPhone('');
     setProvRole('Request Officer');
     setProvDeptId(orgDepts[0]?.id || '');
-    setProvTempPassword(`Procura#${Math.floor(1000 + Math.random() * 9000)}`);
+    setProvTempPassword(generateTempPassword());
     setProvRequireChange(true);
     setProvError('');
     setProvisionModalOpen(true);
@@ -314,7 +315,10 @@ export const UserManagementModule: React.FC = () => {
                                 Edit Role
                               </button>
                               <button
-                                onClick={() => adminResetUserPassword(u.id)}
+                                onClick={() => {
+                                  const temp = adminResetUserPassword(u.id);
+                                  if (temp) alert(`Temporary password for ${u.fullName}:\n\n${temp}\n\nShare it securely. They must change it at next sign-in. It will not be shown again.`);
+                                }}
                                 className="p-1 rounded bg-[#132A20] hover:bg-[#1F3A2D] text-[#A8B5AB]"
                                 title="Reset to Temporary Password"
                               >
@@ -436,7 +440,7 @@ export const UserManagementModule: React.FC = () => {
               <button
                 type="button"
                 onClick={() =>
-                  setProvTempPassword(`Procura#${Math.floor(1000 + Math.random() * 9000)}`)
+                  setProvTempPassword(generateTempPassword())
                 }
                 className="text-[11px] text-[#D4AF37] hover:underline"
               >

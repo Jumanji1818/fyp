@@ -3,6 +3,9 @@
 const { app, BrowserWindow, protocol, net, shell, Menu, ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
+const { openDatabase } = require('./db.cjs');
+
+if (process.env.PROCURA_USERDATA) app.setPath('userData', process.env.PROCURA_USERDATA); // test hook
 const path = require('path');
 const { pathToFileURL } = require('url');
 
@@ -11,6 +14,32 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 const DIST = path.join(__dirname, '..', 'dist');
+
+// ---- Local database (SQLite file in the user's profile; survives restarts and app updates) ----
+let db;
+function getDb() {
+  if (!db) db = openDatabase(process.env.PROCURA_DB || path.join(app.getPath('userData'), 'procura.db'));
+  return db;
+}
+ipcMain.on('db:load-all', (e) => { try { e.returnValue = getDb().loadAll(); } catch (err) { console.error('db load failed', err); e.returnValue = {}; } });
+ipcMain.on('db:set', (_e, key, value) => { try { getDb().setItem(key, value); } catch (err) { console.error('db set failed', err); } });
+ipcMain.on('db:remove', (_e, key) => { try { getDb().removeItem(key); } catch (err) { console.error('db remove failed', err); } });
+ipcMain.on('db:clear', () => { try { getDb().clear(); } catch (err) { console.error('db clear failed', err); } });
+ipcMain.handle('db:backup', async (event) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const r = await dialog.showSaveDialog(win, {
+      defaultPath: path.join(app.getPath('documents'), `Procura-backup-${stamp}.db`),
+      filters: [{ name: 'Procura database backup', extensions: ['db'] }],
+    });
+    if (r.canceled || !r.filePath) return { canceled: true };
+    if (fs.existsSync(r.filePath)) fs.unlinkSync(r.filePath);
+    getDb().backupTo(r.filePath);
+    return { path: r.filePath };
+  } catch (e) { return { error: String((e && e.message) || e) }; }
+});
+app.on('before-quit', () => { try { db && db.close(); } catch {} });
 
 // Save the current page (the document being printed) as an A4 PDF, then open it.
 ipcMain.handle('save-pdf', async (event, defaultName) => {

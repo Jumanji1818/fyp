@@ -24,7 +24,7 @@ export const VendorRegisterModal: React.FC<VendorRegisterModalProps> = ({
   onClose,
   onRegistered,
 }) => {
-  const { categories, vendors, users, switchUser, addAuditLog, addNotification } = useApp();
+  const { categories, vendors, users, registerVendorAccount, addAuditLog, addNotification } = useApp();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Step 1: Business details
@@ -49,7 +49,7 @@ export const VendorRegisterModal: React.FC<VendorRegisterModalProps> = ({
   // Step 4: Account details
   const [contactPerson, setContactPerson] = useState('');
   const [accountEmail, setAccountEmail] = useState('');
-  const [password, setPassword] = useState('Procura@2026');
+  const [password, setPassword] = useState('');
   const [securityQuestion, setSecurityQuestion] = useState("What was your primary school's name?");
   const [securityAnswer, setSecurityAnswer] = useState('Kings College');
 
@@ -147,8 +147,11 @@ export const VendorRegisterModal: React.FC<VendorRegisterModalProps> = ({
       createdAt: new Date().toISOString(),
     };
 
-    vendors.push(newVendor);
-    users.push(newUser);
+    const created = registerVendorAccount(newVendor, newUser, password);
+    if (!created.success) {
+      setError(created.error || 'Registration failed.');
+      return;
+    }
 
     addAuditLog(
       'Vendor Self-Registered',
@@ -165,8 +168,7 @@ export const VendorRegisterModal: React.FC<VendorRegisterModalProps> = ({
       type: 'info',
     });
 
-    // Auto-login and switch to this new vendor
-    switchUser(userId);
+    // The new vendor is signed in with the password they just chose
     onRegistered();
   };
 

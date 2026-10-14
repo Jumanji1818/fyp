@@ -1,5 +1,6 @@
 const { app, BrowserWindow, protocol, net } = require('electron');
 const path = require('path'); const fs = require('fs'); const { pathToFileURL } = require('url');
+require('./dbstub.cjs');
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 const DIST = path.join(__dirname, '..', 'dist'); const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const { ipcMain, dialog, shell } = require('electron');
@@ -13,7 +14,7 @@ app.whenReady().then(async () => {
   await run(`window.__click=(re)=>{const b=[...document.querySelectorAll('button,a')].find(x=>re.test((x.innerText||x.title||'').trim()));if(b){b.click();return true}return false};window.__fill=(el,v)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}))};true`);
   await run(`__click(/Load Demo Data/i)`); await sleep(1500);
   await run(`__click(/log\\s?out/i)`); await sleep(800); await run(`__click(/^Already have an account|Sign in$/i)`); await sleep(500);
-  await run(`(()=>{__fill(document.querySelector('input[type=text],input[type=email]'),'chidiebere.okonkwo@emeraldcourtestates.ng');__fill(document.querySelector('input[type=password]'),'x');document.querySelector('button[type=submit]').click();return true})()`); await sleep(1500);
+  await run(`(()=>{__fill(document.querySelector('input[type=text],input[type=email]'),'chidiebere.okonkwo@emeraldcourtestates.ng');__fill(document.querySelector('input[type=password]'),'Procura@2026');document.querySelector('button[type=submit]').click();return true})()`); await sleep(1500);
   const tab = process.env.TAB || 'Award Contract Decisions';
   await run(`__click(/^\\s*Menu\\s*$/i)`); await sleep(400);
   await run(`(()=>{[...document.querySelectorAll('aside nav button')].find(x=>(x.innerText||'').trim()===${JSON.stringify(tab)}).click();return true})()`); await sleep(1200);

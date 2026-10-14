@@ -40,15 +40,16 @@ jobs:
 
       - name: Save build logs to a branch (always)
         if: always()
+        continue-on-error: true
         run: |
           mkdir -p ../ci-logs
           cp *.log ../ci-logs/ 2>/dev/null || true
           echo "run ${{ github.run_id }} status ${{ job.status }}" > ../ci-logs/status.txt
           git config user.name "ci"
           git config user.email "ci@users.noreply.github.com"
-          git checkout --orphan build-logs
-          git rm -rf . -q
+          git checkout -q --orphan build-logs
+          git reset -q
           cp ../ci-logs/* .
-          git add -A
+          git add -f ./*.log status.txt
           git commit -q -m "build logs run ${{ github.run_id }}"
-          git push -f origin build-logs
+          git push -q -f origin build-logs

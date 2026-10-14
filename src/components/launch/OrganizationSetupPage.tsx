@@ -1,3 +1,4 @@
+import { validatePassword } from '../../utils/password';
 import React, { useState } from 'react';
 import {
   Building,
@@ -51,8 +52,8 @@ export const OrganizationSetupPage: React.FC<OrganizationSetupPageProps> = ({
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPhone, setAdminPhone] = useState('');
-  const [password, setPassword] = useState('Procura@2026');
-  const [confirmPassword, setConfirmPassword] = useState('Procura@2026');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   const selectedCurrency = CURRENCIES.find((c) => c.code === currency) || CURRENCIES[0];
@@ -78,8 +79,9 @@ export const OrganizationSetupPage: React.FC<OrganizationSetupPageProps> = ({
       setErrorMsg('Passwords do not match.');
       return;
     }
-    if (password.length < 6) {
-      setErrorMsg('Password should be at least 6 characters.');
+    const pwProblem = validatePassword(password);
+    if (pwProblem) {
+      setErrorMsg(pwProblem);
       return;
     }
 

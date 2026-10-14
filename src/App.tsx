@@ -23,6 +23,7 @@ import { RequestsModule } from './components/requests/RequestsModule';
 import { DepartmentApprovalsModule } from './components/requests/DepartmentApprovalsModule';
 import { TendersModule } from './components/tenders/TendersModule';
 import { VendorPortalModule } from './components/vendor/VendorPortalModule';
+import { E2EHook } from './utils/e2eHook';
 import { AuthorityApprovalsModule } from './components/evaluation/AuthorityApprovalsModule';
 import { EvaluationModule } from './components/evaluation/EvaluationModule';
 import { PurchaseOrdersModule } from './components/orders/PurchaseOrdersModule';
@@ -119,6 +120,7 @@ const MainApp: React.FC = () => {
   return (
     <div className="flex flex-col h-screen h-[100dvh] w-full max-w-full overflow-hidden bg-[#07130E] text-[#F2EFE6] select-none font-sans">
       {/* Frameless Desktop Custom Title Bar (Section 5) */}
+      {import.meta.env.VITE_E2E && <E2EHook />}
       {!(window as any).procuraDesktop && <DesktopTitleBar />}
 
       {/* Splash Screen on startup */}

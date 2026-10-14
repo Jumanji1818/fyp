@@ -10,7 +10,7 @@ interface StaffRegisterModalProps {
 }
 
 export const StaffRegisterModal: React.FC<StaffRegisterModalProps> = ({ isOpen, onClose }) => {
-  const { departments, users, currentOrganization } = useApp();
+  const { departments, users, currentOrganization, registerStaffAccount } = useApp();
   const orgDepts = departments.filter((d) =>
     d.organizationId ? d.organizationId === currentOrganization.id : currentOrganization.id === 'org-emerald'
   );
@@ -39,22 +39,19 @@ export const StaffRegisterModal: React.FC<StaffRegisterModalProps> = ({ isOpen, 
       return;
     }
 
-    const newUser: User = {
-      id: 'user-' + Date.now(),
-      organizationId: currentOrganization.id,
+    const result = registerStaffAccount({
       fullName,
       email,
       phone,
-      role: 'Pending',
       departmentId: deptId || orgDepts[0]?.id,
-      status: 'Pending',
       securityQuestion,
       securityAnswer,
-      createdAt: new Date().toISOString(),
-    };
-
-    // Save into users in memory / AppContext
-    users.push(newUser);
+      password,
+    });
+    if (!result.success) {
+      setError(result.error || 'Registration failed.');
+      return;
+    }
     setIsPending(true);
   };
 

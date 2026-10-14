@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { appStorage } from '../utils/storage';
+import { createPasswordRecord, verifyPassword, validatePassword, generateTempPassword, normalizeAnswer } from '../utils/password';
 import {
   Organization,
   OrganizationType,
@@ -59,7 +61,7 @@ interface AppContextType {
       phone: string;
       password: string;
     }
-  ) => { success: boolean; organization: Organization; adminUser: User };
+  ) => { success: boolean; error?: string; organization?: Organization; adminUser?: User };
   provisionStaffUser: (data: {
     fullName: string;
     email: string;
@@ -127,7 +129,13 @@ interface AppContextType {
   adminApproveUser: (userId: string, role: UserRole, deptId?: string) => void;
   adminUpdateUserRole: (userId: string, newRole: UserRole, deptId?: string) => void;
   adminToggleUserStatus: (userId: string) => void;
-  adminResetUserPassword: (userId: string) => void;
+  adminResetUserPassword: (userId: string) => string | null;
+  registerStaffAccount: (data: {
+    fullName: string; email: string; phone: string; departmentId?: string;
+    securityQuestion?: string; securityAnswer?: string; password: string;
+  }) => { success: boolean; error?: string };
+  registerVendorAccount: (vendor: VendorProfile, user: User, password: string) => { success: boolean; error?: string };
+  resetPasswordWithAnswer: (email: string, answer: string, newPassword: string) => { success: boolean; error?: string };
   addCategory: (name: string, subcategories: string[]) => void;
   deactivateCategory: (categoryId: string) => void;
   reactivateCategory: (categoryId: string) => void;
@@ -151,17 +159,17 @@ const STORAGE_PREFIX = 'procura_app_v1_';
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Primary state loaded from LocalStorage if present, else initial seed data
   const [organizations, setOrganizations] = useState<Organization[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'organizations');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'organizations');
     return saved ? JSON.parse(saved) : INITIAL_ORGANIZATIONS;
   });
 
   const [currentOrganization, setCurrentOrganization] = useState<Organization>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'current_organization');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'current_organization');
     const orgs: Organization[] = (() => {
-      const savedOrgs = localStorage.getItem(STORAGE_PREFIX + 'organizations');
+      const savedOrgs = appStorage.getItem(STORAGE_PREFIX + 'organizations');
       return savedOrgs ? JSON.parse(savedOrgs) : INITIAL_ORGANIZATIONS;
     })();
-    const savedUserStr = localStorage.getItem(STORAGE_PREFIX + 'current_user');
+    const savedUserStr = appStorage.getItem(STORAGE_PREFIX + 'current_user');
     if (savedUserStr) {
       try {
         const u = JSON.parse(savedUserStr);
@@ -187,7 +195,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   });
 
   const [settings, setSettings] = useState<OrganizationSettings>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'settings');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'settings');
     const base = saved ? JSON.parse(saved) : INITIAL_SETTINGS;
     // ensure settings reflect currentOrganization
     return {
@@ -202,75 +210,75 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   });
 
   const [departments, setDepartments] = useState<Department[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'departments');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'departments');
     const list: Department[] = saved ? JSON.parse(saved) : INITIAL_DEPARTMENTS;
     return list.map((d) => (d.organizationId ? d : { ...d, organizationId: 'org-emerald' }));
   });
 
   const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'users');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'users');
     const list: User[] = saved ? JSON.parse(saved) : INITIAL_USERS;
     return list.map((u) => (u.organizationId || u.role === 'Vendor' ? u : { ...u, organizationId: 'org-emerald' }));
   });
 
   const [categories, setCategories] = useState<Category[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'categories');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'categories');
     return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
   });
 
   const [vendors, setVendors] = useState<VendorProfile[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'vendors');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'vendors');
     return saved ? JSON.parse(saved) : INITIAL_VENDORS;
   });
 
   const [requests, setRequests] = useState<PurchaseRequest[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'requests');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'requests');
     const list: PurchaseRequest[] = saved ? JSON.parse(saved) : INITIAL_REQUESTS;
     return list.map((r) => (r.organizationId ? r : { ...r, organizationId: 'org-emerald' }));
   });
 
   const [tenders, setTenders] = useState<Tender[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'tenders');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'tenders');
     const list: Tender[] = saved ? JSON.parse(saved) : INITIAL_TENDERS;
     return list.map((t) => (t.organizationId ? t : { ...t, organizationId: 'org-emerald' }));
   });
 
   const [bids, setBids] = useState<Bid[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'bids');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'bids');
     return saved ? JSON.parse(saved) : INITIAL_BIDS;
   });
 
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'pos');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'pos');
     const list: PurchaseOrder[] = saved ? JSON.parse(saved) : INITIAL_PURCHASE_ORDERS;
     return list.map((po) => (po.organizationId ? po : { ...po, organizationId: 'org-emerald' }));
   });
 
   const [deliveries, setDeliveries] = useState<DeliveryRecord[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'deliveries');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'deliveries');
     const list: DeliveryRecord[] = saved ? JSON.parse(saved) : INITIAL_DELIVERIES;
     return list.map((del) => (del.organizationId ? del : { ...del, organizationId: 'org-emerald' }));
   });
 
   const [payments, setPayments] = useState<PaymentRecord[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'payments');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'payments');
     const list: PaymentRecord[] = saved ? JSON.parse(saved) : INITIAL_PAYMENTS;
     return list.map((pay) => (pay.organizationId ? pay : { ...pay, organizationId: 'org-emerald' }));
   });
 
   const [budgetChanges, setBudgetChanges] = useState<BudgetChange[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'budget_changes');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'budget_changes');
     return saved ? JSON.parse(saved) : [];
   });
 
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'notifications');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'notifications');
     const list: NotificationItem[] = saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
     return list.map((n) => (n.organizationId ? n : { ...n, organizationId: 'org-emerald' }));
   });
 
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'audit_logs');
+    const saved = appStorage.getItem(STORAGE_PREFIX + 'audit_logs');
     const list: AuditLogEntry[] = saved ? JSON.parse(saved) : INITIAL_AUDIT_LOGS;
     return list.map((a) => (a.organizationId ? a : { ...a, organizationId: 'org-emerald' }));
   });
@@ -288,10 +296,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Sync state to local storage
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'organizations', JSON.stringify(organizations));
+    appStorage.setItem(STORAGE_PREFIX + 'organizations', JSON.stringify(organizations));
   }, [organizations]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'current_organization', JSON.stringify(currentOrganization));
+    appStorage.setItem(STORAGE_PREFIX + 'current_organization', JSON.stringify(currentOrganization));
     setSettings((prev) => ({
       ...prev,
       name: currentOrganization.name,
@@ -309,53 +317,53 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }));
   }, [currentOrganization]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'settings', JSON.stringify(settings));
+    appStorage.setItem(STORAGE_PREFIX + 'settings', JSON.stringify(settings));
   }, [settings]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'departments', JSON.stringify(departments));
+    appStorage.setItem(STORAGE_PREFIX + 'departments', JSON.stringify(departments));
   }, [departments]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'users', JSON.stringify(users));
+    appStorage.setItem(STORAGE_PREFIX + 'users', JSON.stringify(users));
   }, [users]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'categories', JSON.stringify(categories));
+    appStorage.setItem(STORAGE_PREFIX + 'categories', JSON.stringify(categories));
   }, [categories]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'vendors', JSON.stringify(vendors));
+    appStorage.setItem(STORAGE_PREFIX + 'vendors', JSON.stringify(vendors));
   }, [vendors]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'requests', JSON.stringify(requests));
+    appStorage.setItem(STORAGE_PREFIX + 'requests', JSON.stringify(requests));
   }, [requests]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'tenders', JSON.stringify(tenders));
+    appStorage.setItem(STORAGE_PREFIX + 'tenders', JSON.stringify(tenders));
   }, [tenders]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'bids', JSON.stringify(bids));
+    appStorage.setItem(STORAGE_PREFIX + 'bids', JSON.stringify(bids));
   }, [bids]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'pos', JSON.stringify(purchaseOrders));
+    appStorage.setItem(STORAGE_PREFIX + 'pos', JSON.stringify(purchaseOrders));
   }, [purchaseOrders]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'deliveries', JSON.stringify(deliveries));
+    appStorage.setItem(STORAGE_PREFIX + 'deliveries', JSON.stringify(deliveries));
   }, [deliveries]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'payments', JSON.stringify(payments));
+    appStorage.setItem(STORAGE_PREFIX + 'payments', JSON.stringify(payments));
   }, [payments]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'budget_changes', JSON.stringify(budgetChanges));
+    appStorage.setItem(STORAGE_PREFIX + 'budget_changes', JSON.stringify(budgetChanges));
   }, [budgetChanges]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'notifications', JSON.stringify(notifications));
+    appStorage.setItem(STORAGE_PREFIX + 'notifications', JSON.stringify(notifications));
   }, [notifications]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'audit_logs', JSON.stringify(auditLogs));
+    appStorage.setItem(STORAGE_PREFIX + 'audit_logs', JSON.stringify(auditLogs));
   }, [auditLogs]);
   useEffect(() => {
     if (currentUser) {
       sessionStorage.setItem(STORAGE_PREFIX + 'current_user', JSON.stringify(currentUser));
     } else {
       sessionStorage.removeItem(STORAGE_PREFIX + 'current_user');
-      localStorage.removeItem(STORAGE_PREFIX + 'current_user');
+      appStorage.removeItem(STORAGE_PREFIX + 'current_user');
     }
   }, [currentUser]);
 
@@ -463,8 +471,50 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Auth, Organization & Staff Provisioning
-  const login = (email: string, _pass: string) => {
-    const found = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+  const loginAttempts = useRef<Record<string, { count: number; lockedUntil: number }>>({});
+
+  const answerRecord = (answer: string) => {
+    const r = createPasswordRecord(normalizeAnswer(answer));
+    return { securityAnswerSalt: r.passwordSalt, securityAnswerHash: r.passwordHash };
+  };
+  const answerMatches = (u: User, answer: string) => {
+    if (u.securityAnswerHash) {
+      return verifyPassword(normalizeAnswer(answer), { passwordSalt: u.securityAnswerSalt, passwordHash: u.securityAnswerHash });
+    }
+    return !!u.securityAnswer && normalizeAnswer(answer) === normalizeAnswer(u.securityAnswer); // seeded demo accounts
+  };
+
+  /** Returns a lock message if this key is temporarily locked after repeated failures. */
+  const lockMessage = (key: string): string | null => {
+    const rec = loginAttempts.current[key];
+    if (rec && rec.lockedUntil > Date.now()) {
+      return `Too many failed attempts. Try again in ${Math.ceil((rec.lockedUntil - Date.now()) / 60000)} minute(s).`;
+    }
+    return null;
+  };
+  const registerFailure = (key: string) => {
+    const rec = loginAttempts.current[key] || { count: 0, lockedUntil: 0 };
+    rec.count += 1;
+    if (rec.count >= 5) {
+      rec.lockedUntil = Date.now() + 5 * 60 * 1000;
+      rec.count = 0;
+    }
+    loginAttempts.current[key] = rec;
+  };
+
+  const login = (email: string, pass: string) => {
+    const key = email.trim().toLowerCase();
+    const locked = lockMessage(key);
+    if (locked) return { success: false, error: locked };
+    const found = users.find((u) => u.email.toLowerCase() === key);
+    if (found && !found.passwordHash) {
+      return { success: false, error: 'This account has no password yet. Use "Forgot password" to set one.' };
+    }
+    if (!found || !verifyPassword(pass, found)) {
+      registerFailure(key);
+      return { success: false, error: 'Incorrect email or password.' };
+    }
+    delete loginAttempts.current[key];
     if (found) {
       if (found.status === 'Pending') {
         return { success: false, error: 'Your account is pending administrator approval.' };
@@ -534,6 +584,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       password: string;
     }
   ) => {
+    const pwErr = validatePassword(adminData.password);
+    if (pwErr) return { success: false, error: pwErr };
+    if (users.some((u) => u.email.toLowerCase() === adminData.email.trim().toLowerCase())) {
+      return { success: false, error: 'An account with this email address already exists.' };
+    }
     const orgId = 'org-' + Date.now();
     const threshold =
       orgData.approvalThreshold ||
@@ -626,6 +681,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       role: 'Organization Admin',
       status: 'Active',
       avatar: adminData.fullName.substring(0, 2).toUpperCase(),
+      ...createPasswordRecord(adminData.password),
       createdAt: new Date().toISOString(),
     };
 
@@ -664,6 +720,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const switchOrganization = (orgId: string) => {
     const target = organizations.find((o) => o.id === orgId);
     if (!target) return;
+    // A signed-in staff member can never hop into another organisation (that would bypass sign-in)
+    if (currentUser && currentUser.role !== 'Vendor' && currentUser.organizationId && currentUser.organizationId !== orgId) return;
     setCurrentOrganization(target);
     setSettings((prev) => ({
       ...prev,
@@ -680,17 +738,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       phone: target.phone,
       email: target.email,
     }));
-
-    // If current logged-in user belongs to another organization and is not a global Vendor,
-    // switch to the admin user of the target organization for seamless testing!
-    if (currentUser?.role !== 'Vendor') {
-      const targetAdmin =
-        users.find((u) => u.organizationId === orgId && u.role === 'Organization Admin') ||
-        users.find((u) => u.organizationId === orgId && u.role !== 'Vendor');
-      if (targetAdmin) {
-        setCurrentUser(targetAdmin);
-      }
-    }
 
     addAuditLog(
       'Organization Context Switched',
@@ -719,7 +766,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       };
     }
 
-    const tempPass = data.tempPassword || `Procura#${Math.floor(1000 + Math.random() * 9000)}`;
+    const tempPass = data.tempPassword || generateTempPassword();
+    if (tempPass.length < 8) {
+      return { success: false, tempPassword: '', error: 'Temporary password must be at least 8 characters.' };
+    }
 
     const newUser: User = {
       id: 'user-' + Date.now(),
@@ -734,7 +784,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       status: 'Active',
       avatar: data.fullName.substring(0, 2).toUpperCase(),
       mustChangePassword: data.mustChangePassword !== false,
-      tempPassword: tempPass,
+      ...createPasswordRecord(tempPass),
       createdAt: new Date().toISOString(),
     };
 
@@ -750,28 +800,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return { success: true, user: newUser, tempPassword: tempPass };
   };
 
-  const changeTempPassword = (userId: string, _currentPass: string, _newPass: string) => {
+  const changeTempPassword = (userId: string, currentPass: string, newPass: string) => {
     const target = users.find((u) => u.id === userId);
     if (!target) return { success: false, error: 'User account not found.' };
+    if (currentUser?.id !== userId) return { success: false, error: 'You can only change your own password.' };
+    if (!verifyPassword(currentPass, target)) return { success: false, error: 'Your current (temporary) password is incorrect.' };
+    const err = validatePassword(newPass);
+    if (err) return { success: false, error: err };
+    if (newPass === currentPass) return { success: false, error: 'New password must be different from your temporary password.' };
 
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          return {
-            ...u,
-            mustChangePassword: false,
-            tempPassword: undefined,
-          };
-        }
-        return u;
-      })
-    );
-
-    if (currentUser?.id === userId) {
-      setCurrentUser((prev) =>
-        prev ? { ...prev, mustChangePassword: false, tempPassword: undefined } : null
-      );
-    }
+    const rec = createPasswordRecord(newPass);
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...rec, mustChangePassword: false, tempPassword: undefined } : u)));
+    setCurrentUser((prev) => (prev ? { ...prev, ...rec, mustChangePassword: false, tempPassword: undefined } : null));
 
     addAuditLog(
       'Updated First-Login Password',
@@ -780,7 +820,68 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       'Permanent Password Set',
       'User successfully changed their temporary password on first login.'
     );
+    return { success: true };
+  };
 
+  const registerStaffAccount: AppContextType['registerStaffAccount'] = (data) => {
+    const pwErr = validatePassword(data.password);
+    if (pwErr) return { success: false, error: pwErr };
+    if (users.some((u) => u.email.toLowerCase() === data.email.trim().toLowerCase())) {
+      return { success: false, error: 'An account with this email address already exists.' };
+    }
+    const newUser: User = {
+      id: 'user-' + Date.now(),
+      organizationId: currentOrganization.id,
+      fullName: data.fullName,
+      email: data.email.trim(),
+      phone: data.phone,
+      role: 'Pending',
+      departmentId: data.departmentId,
+      status: 'Pending',
+      securityQuestion: data.securityQuestion,
+      ...(data.securityAnswer ? answerRecord(data.securityAnswer) : {}),
+      ...createPasswordRecord(data.password),
+      createdAt: new Date().toISOString(),
+    };
+    setUsers((prev) => [newUser, ...prev]);
+    addNotification({
+      forRole: 'Organization Admin',
+      title: 'New Staff Registration',
+      message: `${newUser.fullName} (${newUser.email}) is waiting for a role assignment.`,
+      type: 'info',
+    });
+    return { success: true };
+  };
+
+  const registerVendorAccount: AppContextType['registerVendorAccount'] = (vendor, user, password) => {
+    const pwErr = validatePassword(password);
+    if (pwErr) return { success: false, error: pwErr };
+    if (users.some((u) => u.email.toLowerCase() === user.email.trim().toLowerCase())) {
+      return { success: false, error: 'An account with this login email already exists.' };
+    }
+    const { securityAnswer, ...userRest } = user;
+    const newUser: User = { ...userRest, ...(securityAnswer ? answerRecord(securityAnswer) : {}), ...createPasswordRecord(password) };
+    setVendors((prev) => [vendor, ...prev]);
+    setUsers((prev) => [newUser, ...prev]);
+    setCurrentUser(newUser);
+    return { success: true };
+  };
+
+  const resetPasswordWithAnswer: AppContextType['resetPasswordWithAnswer'] = (email, answer, newPassword) => {
+    const key = 'reset:' + email.trim().toLowerCase();
+    const locked = lockMessage(key);
+    if (locked) return { success: false, error: locked };
+    const user = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+    if (!user || !user.securityQuestion || !answerMatches(user, answer)) {
+      registerFailure(key);
+      return { success: false, error: 'Incorrect answer to the security question.' };
+    }
+    const err = validatePassword(newPassword);
+    if (err) return { success: false, error: err };
+    const rec = createPasswordRecord(newPassword);
+    setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, ...rec, mustChangePassword: false } : u)));
+    delete loginAttempts.current[key];
+    addAuditLog('Offline Password Reset', user.email, undefined, 'Password Updated', 'Reset via security question.');
     return { success: true };
   };
 
@@ -816,7 +917,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotifications(INITIAL_NOTIFICATIONS);
     setAuditLogs(INITIAL_AUDIT_LOGS);
     setCurrentUser(INITIAL_USERS[0]);
-    localStorage.clear();
+    appStorage.clear();
   };
 
   const resetAllData = () => {
@@ -1170,6 +1271,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const extendTenderDeadline = (tenderId: string, newDate: string, reason: string) => {
+    const tnd = tenders.find((t) => t.id === tenderId);
+    if (!tnd || !currentUser) return;
+    if (!['Procurement Officer', 'Organization Admin'].includes(currentUser.role)) return;
+    if (tnd.status !== 'Open') return;
+    if (new Date(newDate).getTime() <= new Date(tnd.bidClosingDateTime).getTime()) return; // must move the deadline later
     setTenders((prev) =>
       prev.map((t) => {
         if (t.id === tenderId) {
@@ -1932,11 +2038,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   };
 
-  const adminResetUserPassword = (userId: string) => {
+  const adminResetUserPassword = (userId: string): string | null => {
+    if (currentUser?.role !== 'Organization Admin') return null;
     const user = users.find((u) => u.id === userId);
-    if (user) {
-      addAuditLog('Admin Password Reset', user.fullName, undefined, 'Temporary Password Set', 'Forced change required at next sign in.');
-    }
+    if (!user) return null;
+    if (user.organizationId && user.organizationId !== currentOrganization.id) return null;
+    const temp = generateTempPassword();
+    const rec = createPasswordRecord(temp);
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...rec, mustChangePassword: true } : u)));
+    addAuditLog('Admin Password Reset', user.fullName, undefined, 'Temporary Password Set', 'Forced change required at next sign in.');
+    return temp;
   };
 
   // Categories
@@ -2109,6 +2220,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         adminUpdateUserRole,
         adminToggleUserStatus,
         adminResetUserPassword,
+        registerStaffAccount,
+        registerVendorAccount,
+        resetPasswordWithAnswer,
         addCategory,
         deactivateCategory,
         reactivateCategory,

@@ -81,8 +81,12 @@ export interface User {
   avatar?: string;
   securityQuestion?: string;
   securityAnswer?: string;
+  passwordSalt?: string;
+  passwordHash?: string;
+  securityAnswerSalt?: string;
+  securityAnswerHash?: string;
   mustChangePassword?: boolean;
-  tempPassword?: string;
+  tempPassword?: string; // legacy field - no longer written
   createdAt: string;
 }
 
@@ -337,6 +341,8 @@ export interface DeliveryRecord {
   isFullyDelivered: boolean;
   onTime: boolean;
   lateDays: number;
+  resolutionStatus?: 'Pending' | 'Resolved';
+  resolutionNotes?: string;
 }
 
 export interface PaymentRecord {

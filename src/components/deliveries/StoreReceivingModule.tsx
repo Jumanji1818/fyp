@@ -22,6 +22,10 @@ export const StoreReceivingModule: React.FC = () => {
     po.organizationId ? po.organizationId === currentOrganization.id : currentOrganization.id === 'org-emerald'
   );
 
+  const orgDeliveries = deliveries.filter((delivery) =>
+    delivery.organizationId ? delivery.organizationId === currentOrganization.id : currentOrganization.id === 'org-emerald'
+  );
+
   const [activePO, setActivePO] = useState<PurchaseOrder | null>(null);
   const [itemsReceived, setItemsReceived] = useState<
     Array<{
@@ -39,7 +43,7 @@ export const StoreReceivingModule: React.FC = () => {
       po.items.map((i) => ({
         description: i.description,
         ordered: i.quantity,
-        received: i.quantity, // defaults to full ordered
+        received: Math.max(0, i.quantity - (i.receivedQuantity || 0)), // only receive the outstanding quantity
         status: 'Accepted',
       }))
     );
@@ -86,6 +90,25 @@ export const StoreReceivingModule: React.FC = () => {
           <PackageCheck className="w-4 h-4 text-[#3FB67A]" /> {deliveries.length} Received Deliveries
         </div>
       </div>
+
+      {/* Rejected consignments remain visible until a replacement/return inspection resolves them. */}
+      {orgDeliveries.some((del) => del.itemsReceived.some((item) => item.status === 'Rejected') && del.resolutionStatus !== 'Resolved') && (
+        <div className="bg-[#D9534F]/10 rounded-2xl border border-[#D9534F]/40 p-5">
+          <h3 className="text-sm font-bold text-[#F2EFE6] mb-3 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-[#D9534F]" /> Rejected Deliveries Requiring Resolution</h3>
+          <div className="space-y-3">
+            {orgDeliveries.filter((del) => del.itemsReceived.some((item) => item.status === 'Rejected') && del.resolutionStatus !== 'Resolved').map((del) => {
+              const po = orgPOs.find((item) => item.id === del.purchaseOrderId);
+              return <div key={del.id} className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-xl bg-[#07130E] border border-[#D9534F]/30 p-3">
+                <div>
+                  <div className="font-mono font-bold text-[#E8CF7A]">{del.poReference} <span className="font-sans text-[#D9534F]">· Pending</span></div>
+                  {del.itemsReceived.filter((item) => item.status === 'Rejected').map((item, idx) => <p key={`${del.id}-${idx}`} className="text-[11px] text-[#A8B5AB] mt-1">{item.description}: {item.reason || 'No rejection reason recorded'}</p>)}
+                </div>
+                {po && po.status !== 'Delivered' && po.status !== 'Closed' && po.status !== 'Cancelled' && <button onClick={() => openInspection(po)} className="shrink-0 px-3 py-2 rounded-lg bg-[#D9534F]/15 border border-[#D9534F]/40 text-[#F2EFE6] font-semibold">Record replacement / reinspection</button>}
+              </div>;
+            })}
+          </div>
+        </div>
+      )}
 
       {/* POs awaiting receiving / dispatched */}
       <div className="bg-[#0D1F17] rounded-2xl border border-[#1F3A2D] p-5 shadow-xl">
@@ -146,7 +169,7 @@ export const StoreReceivingModule: React.FC = () => {
       {/* Historical Deliveries Log */}
       <div className="bg-[#0D1F17] rounded-2xl border border-[#1F3A2D] p-5 shadow-xl">
         <h3 className="text-sm font-bold font-serif-heading text-[#F2EFE6] mb-3">
-          Completed Delivery Inspection Records
+          Delivery Inspection History
         </h3>
 
         <div className="overflow-x-auto text-xs">
@@ -162,7 +185,7 @@ export const StoreReceivingModule: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1F3A2D]">
-              {deliveries.map((del) => (
+              {orgDeliveries.map((del) => (
                 <tr key={del.id}>
                   <td className="py-2.5 px-3 font-mono font-bold text-[#E8CF7A]">{del.poReference}</td>
                   <td className="py-2.5 px-3 font-semibold text-[#F2EFE6]">{del.vendorName}</td>
@@ -181,7 +204,11 @@ export const StoreReceivingModule: React.FC = () => {
                     )}
                   </td>
                   <td className="py-2.5 px-3 text-center">
-                    <span className="text-[#3FB67A] font-semibold">Accepted & Verified</span>
+                    {del.itemsReceived.some((item) => item.status === 'Rejected') ? (
+                      <span className={`font-semibold ${del.resolutionStatus === 'Resolved' ? 'text-[#3FB67A]' : 'text-[#D9534F]'}`}>{del.resolutionStatus === 'Resolved' ? 'Resolved after reinspection' : 'Rejected · Resolution Pending'}</span>
+                    ) : del.itemsReceived.some((item) => item.status === 'Partially Accepted') ? (
+                      <span className="text-[#D4AF37] font-semibold">Partially Accepted</span>
+                    ) : <span className="text-[#3FB67A] font-semibold">Accepted & Verified</span>}
                   </td>
                 </tr>
               ))}
@@ -225,7 +252,7 @@ export const StoreReceivingModule: React.FC = () => {
                       <input
                         type="number"
                         min={0}
-                        max={line.ordered}
+                        max={Math.max(0, line.ordered - (activePO.items[idx]?.receivedQuantity || 0))}
                         value={line.received}
                         onChange={(e) =>
                           handleLineStatusChange(idx, line.status, Number(e.target.value), line.reason)

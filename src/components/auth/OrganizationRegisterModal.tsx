@@ -1,3 +1,4 @@
+import { validatePassword } from '../../utils/password';
 import React, { useState } from 'react';
 import {
   Building2,
@@ -85,8 +86,9 @@ export const OrganizationRegisterModal: React.FC<OrganizationRegisterModalProps>
       return;
     }
 
-    if (adminPassword.length < 6) {
-      setErrorMsg('Password should be at least 6 characters.');
+    const pwProblem = validatePassword(adminPassword);
+    if (pwProblem) {
+      setErrorMsg(pwProblem);
       return;
     }
 
@@ -120,6 +122,8 @@ export const OrganizationRegisterModal: React.FC<OrganizationRegisterModalProps>
     if (result.success) {
       onSuccess();
       onClose();
+    } else {
+      setErrorMsg(result.error || 'Registration failed.');
     }
   };
 

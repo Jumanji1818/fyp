@@ -1,6 +1,7 @@
 // Dev-only audit harness (not shipped): drives the real app through every role and screen.
 const { app, BrowserWindow, protocol, net } = require('electron');
 const path = require('path'); const fs = require('fs'); const { pathToFileURL } = require('url');
+require('./dbstub.cjs');
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 const DIST = path.join(__dirname, '..', 'dist');
 const USERS = (process.env.AUDIT_USERS || 'admin@emeraldcourtestates.ng,blessing.adeyemi@emeraldcourtestates.ng,fatima.mohammed@emeraldcourtestates.ng,chidiebere.okonkwo@emeraldcourtestates.ng,folake.oshodi@emeraldcourtestates.ng,babatunde.adeleke@emeraldcourtestates.ng,musa@apexholdings.ng,hussain@husabdesign.ng').split(',');
@@ -21,7 +22,7 @@ app.whenReady().then(async () => {
     // logout if authenticated
     await run(`__click(/log\\s?out|sign\\s?out/i)`); await sleep(800);
     await run(`__click(/^Already have an account|Sign in$/i)`); await sleep(500);
-    const filled = await run(`(()=>{const e=document.querySelector('input[type=text],input[type=email]');const p=document.querySelector('input[type=password]');if(!e||!p)return false;__fill(e,${JSON.stringify(email)});__fill(p,'anything');document.querySelector('button[type=submit]').click();return true})()`);
+    const filled = await run(`(()=>{const e=document.querySelector('input[type=text],input[type=email]');const p=document.querySelector('input[type=password]');if(!e||!p)return false;__fill(e,${JSON.stringify(email)});__fill(p,'Procura@2026');document.querySelector('button[type=submit]').click();return true})()`);
     await sleep(1500);
     if (process.env.AUDIT_DEBUG) { console.log('BODY>>', (await run(`document.body.innerText.slice(0,500)`)).replace(/\n+/g,' | ')); }
     entry.loggedIn = await run(`/Log Out/.test(document.body.innerText)`);

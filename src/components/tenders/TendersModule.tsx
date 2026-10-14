@@ -40,6 +40,7 @@ export const TendersModule: React.FC<TendersModuleProps> = ({
     cancelTender,
     settings,
     currentOrganization,
+    currentUser,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'tenders' | 'approved_queue'>('tenders');
@@ -535,12 +536,20 @@ export const TendersModule: React.FC<TendersModuleProps> = ({
             {/* Actions for Officer */}
             <div className="flex items-center justify-between pt-3 border-t border-[#1F3A2D]">
               <div className="flex gap-2">
-                <button
-                  onClick={() => setExtendModalOpen(true)}
-                  className="px-3.5 py-2 rounded-[10px] bg-[#132A20] hover:bg-[#1F3A2D] text-[#E0A93B] font-semibold"
-                >
-                  Extend Deadline
-                </button>
+                {['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') &&
+                  selectedTender.status === 'Open' &&
+                  new Date(selectedTender.bidClosingDateTime).getTime() > Date.now() && (
+                    <button
+                      onClick={() => {
+                        setNewClosingDate('');
+                        setExtendReason('');
+                        setExtendModalOpen(true);
+                      }}
+                      className="px-3.5 py-2 rounded-[10px] bg-[#132A20] hover:bg-[#1F3A2D] text-[#E0A93B] font-semibold"
+                    >
+                      Extend Deadline
+                    </button>
+                  )}
                 <button
                   onClick={() => setCancelModalOpen(true)}
                   className="px-3.5 py-2 rounded-[10px] bg-[#132A20] hover:bg-[#D9534F]/20 text-[#D9534F] font-semibold"

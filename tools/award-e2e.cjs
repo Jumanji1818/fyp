@@ -1,5 +1,6 @@
 const { app, BrowserWindow, protocol, net } = require('electron');
 const path = require('path'); const fs = require('fs'); const { pathToFileURL } = require('url');
+require('./dbstub.cjs');
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 const DIST = path.join(__dirname, '..', 'dist'); const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 app.whenReady().then(async () => {
@@ -9,7 +10,7 @@ app.whenReady().then(async () => {
   await win.loadURL('app://procura/index.html'); await sleep(4500);
   const run = (c) => win.webContents.executeJavaScript(c, true);
   const shot = async (n) => fs.writeFileSync('/tmp/shots/e2e_' + n + '.png', (await win.webContents.capturePage()).toPNG());
-  await run(`window.__click=(re)=>{const b=[...document.querySelectorAll('button,a')].find(x=>re.test((x.innerText||x.title||'').trim()));if(b){b.click();return true}return false};window.__fill=(el,v)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}))};window.__nav=(l)=>{__click(/^\\s*Menu\\s*$/i);return new Promise(r=>setTimeout(()=>{const b=[...document.querySelectorAll('aside nav button')].find(x=>(x.innerText||'').trim()===l);b&&b.click();r(!!b)},400))};window.__login=async(e)=>{__click(/log\\s?out/i);await new Promise(r=>setTimeout(r,800));__click(/^Already have an account|Sign in$/i);await new Promise(r=>setTimeout(r,500));__fill(document.querySelector('input[type=text],input[type=email]'),e);__fill(document.querySelector('input[type=password]'),'x');document.querySelector('button[type=submit]').click();await new Promise(r=>setTimeout(r,1500));return true};true`);
+  await run(`window.__click=(re)=>{const b=[...document.querySelectorAll('button,a')].find(x=>re.test((x.innerText||x.title||'').trim()));if(b){b.click();return true}return false};window.__fill=(el,v)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}))};window.__nav=(l)=>{__click(/^\\s*Menu\\s*$/i);return new Promise(r=>setTimeout(()=>{const b=[...document.querySelectorAll('aside nav button')].find(x=>(x.innerText||'').trim()===l);b&&b.click();r(!!b)},400))};window.__login=async(e)=>{__click(/log\\s?out/i);await new Promise(r=>setTimeout(r,800));__click(/^Already have an account|Sign in$/i);await new Promise(r=>setTimeout(r,500));__fill(document.querySelector('input[type=text],input[type=email]'),e);__fill(document.querySelector('input[type=password]'),'Procura@2026');document.querySelector('button[type=submit]').click();await new Promise(r=>setTimeout(r,1500));return true};true`);
   await run(`__click(/Load Demo Data/i)`); await sleep(1500);
   await run(`__login('chidiebere.okonkwo@emeraldcourtestates.ng')`);
   await run(`__nav('Evaluation & Scoring')`); await sleep(1200);
