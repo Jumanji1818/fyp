@@ -17,7 +17,7 @@ export const MustChangePasswordModal: React.FC = () => {
     return null;
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -41,7 +41,7 @@ export const MustChangePasswordModal: React.FC = () => {
       return;
     }
 
-    const result = changeTempPassword(currentUser.id, currentPass, newPass);
+    const result = await changeTempPassword(currentUser.id, currentPass, newPass);
     if (result.success) {
       setSuccess(true);
     } else {
