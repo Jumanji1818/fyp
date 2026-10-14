@@ -94,9 +94,10 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   // User-relevant notifications
   const userNotifs = notifications.filter((n) => {
-    if (n.userId && currentUser?.id) return n.userId === currentUser.id;
+    if (n.userId) return n.userId === currentUser?.id;
+    if (n.organizationId && n.organizationId !== currentOrganization.id) return false;
     if (n.forRole && currentUser?.role) return n.forRole === currentUser.role;
-    return true;
+    return !n.organizationId || n.organizationId === currentOrganization.id;
   });
 
   const unreadCount = userNotifs.filter((n) => !n.read).length;
