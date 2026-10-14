@@ -34,4 +34,4 @@ app.whenReady().then(async () => {
   console.log('PDF E2E SUMMARY', JSON.stringify({ pdfExists, pdfBytes, appVisible, failures }));
   if (failures.length) { console.error('PDF E2E FAILED'); process.exitCode = 1; }
   app.quit();
-});
+}).catch((error) => { console.error('PDF E2E CRASHED', error); process.exitCode = 1; app.quit(); });

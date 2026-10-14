@@ -51,4 +51,4 @@ app.whenReady().then(async () => {
   console.log('AWARD E2E SUMMARY', JSON.stringify({ initialPoCount, poCountBeforeAuthority, finalPoCount, heldForAuthority, rejectionReasonRequired, failures }));
   if (failures.length) { console.error('AWARD E2E FAILED'); process.exitCode = 1; }
   app.quit();
-});
+}).catch((error) => { console.error('AWARD E2E CRASHED', error); process.exitCode = 1; app.quit(); });

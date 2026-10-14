@@ -102,4 +102,4 @@ app.whenReady().then(async () => {
   if (passed !== results.length || errs.length) { console.error('AUTH E2E FAILED'); process.exitCode = 1; }
   else console.log('AUTH E2E PASSED');
   db.close(); app.quit();
-});
+}).catch((error) => { console.error('AUTH E2E CRASHED', error); process.exitCode = 1; app.quit(); });

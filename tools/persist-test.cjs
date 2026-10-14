@@ -44,4 +44,4 @@ app.whenReady().then(async () => {
   console.log('PERSIST E2E SUMMARY', JSON.stringify({ mode, failures }));
   if (failures.length) { console.error('PERSIST E2E FAILED'); process.exitCode = 1; }
   db.close(); app.quit();
-});
+}).catch((error) => { console.error('PERSISTENCE E2E CRASHED', error); process.exitCode = 1; app.quit(); });

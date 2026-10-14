@@ -52,4 +52,4 @@ app.whenReady().then(async () => {
   if (failures.length || consoleErrs.length) { console.error('AUDIT FAILED'); process.exitCode = 1; }
   else console.log('AUDIT DONE');
   app.quit();
-});
+}).catch((error) => { console.error('ROLE/SREEN AUDIT CRASHED', error); process.exitCode = 1; app.quit(); });
