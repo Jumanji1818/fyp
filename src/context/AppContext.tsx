@@ -1328,10 +1328,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const cancelPurchaseOrder = (poId: string, reason: string): boolean => {
     const po = purchaseOrders.find((entry) => entry.id === poId);
-    if (!po || (po.organizationId && po.organizationId !== currentOrganization.id) || !reason.trim() || !['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') || ['Delivered', 'Closed', 'Cancelled'].includes(po.status)) return false;
+    if (!po || (po.organizationId && po.organizationId !== currentOrganization.id) || !reason.trim() || !['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') || !['Issued', 'Acknowledged'].includes(po.status)) return false;
     const release = remainingCommitmentAfterCancellation(po.totalAmount, po.paidAmount);
     setPurchaseOrders((prev) => prev.map((entry) => entry.id === poId ? { ...entry, status: 'Cancelled' } : entry));
     setDepartments((prev) => prev.map((entry) => entry.id === po.departmentId ? { ...entry, committed: Math.max(0, entry.committed - release) } : entry));
+    setVendors((prev) => prev.map((vendor) => vendor.id === po.vendorId ? { ...vendor, totalOrders: Math.max(0, vendor.totalOrders - 1), totalValueAwarded: Math.max(0, vendor.totalValueAwarded - po.totalAmount) } : vendor));
     setTenders((prev) => prev.map((entry) => entry.id === po.tenderId ? { ...entry, status: 'Cancelled', awaitingAuthorityApproval: false, pendingAuthorityBidId: undefined, cancellationReason: reason.trim() } : entry));
     addAuditLog('Cancelled Purchase Order', po.referenceNumber, po.status, 'Cancelled', `Released remaining commitment ₦${release.toLocaleString()}. Reason: ${reason.trim()}`);
     addNotification({ userId: vendors.find((vendor) => vendor.id === po.vendorId)?.userId, forRole: 'Vendor', title: 'Purchase Order Cancelled', message: `${po.referenceNumber} was cancelled: ${reason.trim()}`, type: 'danger', recordType: 'po', recordId: poId });
@@ -1604,6 +1605,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     setPurchaseOrders((prev) => [newPO, ...prev]);
+    setVendors((prev) => prev.map((entry) => entry.id === winBid.vendorId ? {
+      ...entry,
+      totalOrders: entry.totalOrders + 1,
+      totalValueAwarded: entry.totalValueAwarded + winBid.totalAmount,
+    } : entry));
 
     // Update Department Committed Budget
     if (dept) {
@@ -1671,8 +1677,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const bid = bids.find((b) => b.id === winningBidId && b.tenderId === tenderId);
     const dept = tender && departments.find((d) => d.id === tender.departmentId);
     if (!tender || !bid || !dept) return { requiresAuthority: false, blocked: 'Tender, bid, or department not found.' };
-    if (currentUser?.role !== 'Procurement Officer' && currentUser?.role !== 'Organization Admin') {
-      return { requiresAuthority: false, blocked: 'Only Procurement can submit a budget override request.' };
+    const isSoloOwner = isSoloOwnerFlow(currentOrganization.type, currentUser?.organizationId, currentOrganization.id);
+    if (currentUser?.role !== 'Procurement Officer' && !isSoloOwner) {
+      return { requiresAuthority: false, blocked: 'Only the Procurement Officer can submit a budget override request.' };
     }
     if (!overrideReason.trim()) return { requiresAuthority: false, blocked: 'A reason is required for the Finance override request.' };
     const remaining = dept.annualBudget - dept.spent - dept.committed;
@@ -1720,7 +1727,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const decideBudgetOverride = (requestId: string, approved: boolean, comment: string) => {
     const request = budgetOverrideRequests.find((entry) => entry.id === requestId);
-    if (!request || currentUser?.role !== 'Finance Officer' || !comment.trim()) return;
+    const isSoloOwner = isSoloOwnerFlow(currentOrganization.type, currentUser?.organizationId, currentOrganization.id);
+    if (!request || request.organizationId !== currentOrganization.id || (currentUser?.role !== 'Finance Officer' && !isSoloOwner) || !comment.trim()) return;
     const status = resolveBudgetOverride(request.status, approved);
     if (!status) return;
     setBudgetOverrideRequests((prev) => prev.map((entry) => entry.id === requestId ? {
@@ -1795,7 +1803,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const po = purchaseOrders.find((p) => p.id === poId);
     const isSoloOwner = isSoloOwnerFlow(currentOrganization.type, currentUser?.organizationId, currentOrganization.id);
     if (!po || !['Request Officer', 'Organization Admin'].includes(currentUser?.role || '') && !isSoloOwner) return;
-    if (po.organizationId && po.organizationId !== currentOrganization.id || ['Cancelled', 'Closed'].includes(po.status)) return;
+    if ((po.organizationId && po.organizationId !== currentOrganization.id) || ['Cancelled', 'Closed', 'Delivered'].includes(po.status)) return;
     if (!Array.isArray(itemsReceived) || itemsReceived.length !== po.items.length) return;
     if (itemsReceived.some((item) => !item || !Number.isFinite(item.received) || item.received < 0 || !['Accepted', 'Partially Accepted', 'Rejected'].includes(item.status))) return;
 
@@ -1866,7 +1874,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             onTimeDeliveries: onTime,
             lateDeliveries: late,
             rejections: rejected,
-            totalOrders: v.totalOrders + (isFirstCompleteReceipt ? 1 : 0),
+            totalOrders: v.totalOrders,
             reliabilityScore: calculateReliabilityScore(onTime, late, rejected),
           };
         }
@@ -1905,6 +1913,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const newPayment: PaymentRecord = {
       ...paymentData,
+      organizationId: po.organizationId || currentOrganization.id,
+      purchaseOrderId: po.id,
+      poReference: po.referenceNumber,
+      vendorId: po.vendorId,
+      vendorName: po.vendorName,
+      departmentId: po.departmentId,
+      departmentName: po.departmentName,
       id: 'pay-' + Date.now(),
       voucherNumber,
       recordedByUserId: currentUser?.id || 'finance',
