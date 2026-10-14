@@ -1320,20 +1320,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const target = tenders.find((t) => t.id === tenderId);
     if (!target || (target.organizationId && target.organizationId !== currentOrganization.id) || !reason.trim() || !['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') || target.status === 'Cancelled') return;
     const linkedPO = purchaseOrders.find((po) => po.tenderId === tenderId);
-    if (linkedPO && !cancelPurchaseOrder(linkedPO.id, reason)) return;
-    setTenders((prev) =>
-      prev.map((t) => {
-        if (t.id === tenderId) {
-          addAuditLog('Cancelled Tender', t.referenceNumber, t.status, 'Cancelled', `Reason: ${reason}`);
-          return {
-            ...t,
-            status: 'Cancelled',
-            cancellationReason: reason,
-          };
-        }
-        return t;
-      })
-    );
+    if (linkedPO) {
+      if (!cancelPurchaseOrder(linkedPO.id, reason)) return;
+      addAuditLog('Cancelled Tender', target.referenceNumber, target.status, 'Cancelled', `Reason: ${reason.trim()}`);
+    } else {
+      setTenders((prev) =>
+        prev.map((t) => {
+          if (t.id === tenderId) {
+            addAuditLog('Cancelled Tender', t.referenceNumber, t.status, 'Cancelled', `Reason: ${reason.trim()}`);
+            return { ...t, status: 'Cancelled', cancellationReason: reason.trim(), awaitingAuthorityApproval: false, pendingAuthorityBidId: undefined };
+          }
+          return t;
+        })
+      );
+    }
+    setBids((prev) => prev.map((bid) => bid.tenderId === tenderId ? { ...bid, status: 'Withdrawn' } : bid));
     const request = requests.find((r) => r.id === target.requestId);
     addNotification({ forRole: 'Procurement Officer', title: 'Tender Cancelled', message: `${target.referenceNumber} was cancelled. Reason: ${reason.trim()}`, type: 'danger', recordType: 'tender', recordId: tenderId });
     if (request) addNotification({ userId: request.requesterId, title: 'Tender Cancelled', message: `Tender ${target.referenceNumber} for your request ${request.referenceNumber} was cancelled: ${reason.trim()}`, type: 'warning', recordType: 'tender', recordId: tenderId });
@@ -1667,15 +1668,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const authorityApproveAward = (tenderId: string, approved: boolean, reason?: string) => {
     const tnd = tenders.find((t) => t.id === tenderId);
-    const winBidId = tnd?.pendingAuthorityBidId || bids.find((b) => b.tenderId === tenderId)?.id;
+    const winBidId = tnd?.pendingAuthorityBidId;
     const winBid = bids.find((b) => b.id === winBidId);
     if (!tnd || !winBid || (tnd.organizationId && tnd.organizationId !== currentOrganization.id)) return;
     if (currentUser?.role !== 'Approving Authority') return;
-    if (!tnd.awaitingAuthorityApproval) return;
+    if (!tnd.awaitingAuthorityApproval || winBid.tenderId !== tenderId) return;
 
     if (approved) {
-      const vendor = vendors.find((v) => v.id === winBid.vendorId);
       const dept = departments.find((d) => d.id === tnd.departmentId);
+      const overrideApproved = budgetOverrideRequests.some((request) => request.tenderId === tenderId && request.bidId === winBid.id && request.status === 'Approved');
+      if (dept && !canCommitBudget(dept.annualBudget, dept.spent, dept.committed, winBid.totalAmount, overrideApproved)) {
+        setTenders((prev) => prev.map((entry) => entry.id === tenderId ? { ...entry, status: 'Under Evaluation', awaitingAuthorityApproval: false, pendingAuthorityBidId: undefined } : entry));
+        addAuditLog('Authority Approval Blocked by Budget Check', tnd.referenceNumber, 'Awaiting Authority Approval', 'Returned to Evaluation', 'Budget availability changed before Authority sign-off; a Finance-approved override is required.');
+        addNotification({ forRole: 'Procurement Officer', title: 'Award Returned for Budget Review', message: `The budget for ${tnd.referenceNumber} changed before Authority sign-off. Submit a Finance override request before trying again.`, type: 'warning', recordType: 'tender', recordId: tenderId });
+        return;
+      }
+      const vendor = vendors.find((v) => v.id === winBid.vendorId);
       finalizeAward(tenderId, winBid, vendor, dept, `Approved by Authority: ${reason || 'Approved'}`);
     } else {
       setTenders((prev) =>
@@ -2031,7 +2039,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     reason?: string,
     targetOrgId?: string
   ) => {
-    if (!['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') || !reason?.trim() || targetOrgId && targetOrgId !== currentOrganization.id) return;
+    const isSoloOwner = isSoloOwnerFlow(currentOrganization.type, currentUser?.organizationId, currentOrganization.id);
+    if ((currentUser?.role !== 'Procurement Officer' && !isSoloOwner) || !reason?.trim() || (targetOrgId && targetOrgId !== currentOrganization.id)) return;
     const orgId = targetOrgId || currentOrganization.id;
     setVendors((prev) =>
       prev.map((v) => {
