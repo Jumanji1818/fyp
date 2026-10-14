@@ -25,7 +25,8 @@ describe('report data exports', () => {
     expect(tenderSummaryRows([tender])[1]).toEqual(['TND-TEST-01', 'Test Tender', 'ICT', 'Closed', '2026-10-14T12:00:00Z']);
   });
 
-  it('escapes embedded quotes and line breaks safely for CSV', () => {
+  it('escapes embedded quotes and line breaks and neutralizes spreadsheet formulas', () => {
     expect(serializeCsv([['Vendor', 'Amount'], ['A "quoted", Inc', 10]])).toBe('"Vendor","Amount"\r\n"A ""quoted"", Inc","10"');
+    expect(serializeCsv([['=HYPERLINK("https://bad.example")', '+SUM(A1:A2)', '-cmd', '@SUM(A1:A2)']])).toBe('"\'=HYPERLINK(""https://bad.example"")","\'+SUM(A1:A2)","\'-cmd","\'@SUM(A1:A2)"');
   });
 });
