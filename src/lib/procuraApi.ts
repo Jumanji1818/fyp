@@ -97,6 +97,10 @@ export const procuraApi = {
   ),
   listRecords: <TData = Record<string, unknown>>(recordType: string) =>
     request<{ records: ApiRecord<TData>[] }>(`/api/records/${encodeURIComponent(recordType)}`),
+  transitionRecord: <TData = Record<string, unknown>>(recordId: string, nextStatus: string, reason?: string) =>
+    request<{ record: ApiRecord<TData> }>(`/api/records/${encodeURIComponent(recordId)}/transition`, {
+      method: 'PATCH', body: { nextStatus, reason },
+    }),
   createRecord: <TData = Record<string, unknown>>(record: {
     recordType: string;
     referenceNumber?: string | null;
