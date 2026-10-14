@@ -1293,7 +1293,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const cancelTender = (tenderId: string, reason: string) => {
     const target = tenders.find((t) => t.id === tenderId);
-    if (!target || !reason.trim() || !['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') || target.status === 'Cancelled') return;
+    if (!target || (target.organizationId && target.organizationId !== currentOrganization.id) || !reason.trim() || !['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') || target.status === 'Cancelled') return;
     const linkedPO = purchaseOrders.find((po) => po.tenderId === tenderId);
     if (linkedPO && !cancelPurchaseOrder(linkedPO.id, reason)) return;
     setTenders((prev) =>
@@ -1316,7 +1316,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const cancelRequest = (requestId: string, reason: string) => {
     const request = requests.find((entry) => entry.id === requestId);
-    if (!request || !reason.trim() || request.status === 'Cancelled' || request.status === 'Converted to Tender') return;
+    if (!request || (request.organizationId && request.organizationId !== currentOrganization.id) || !reason.trim() || request.status === 'Cancelled' || request.status === 'Converted to Tender') return;
     const isOwner = currentUser?.id === request.requesterId;
     const isAdmin = ['Organization Admin', 'Department Head'].includes(currentUser?.role || '');
     if (!isOwner && !isAdmin) return;
@@ -1328,7 +1328,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const cancelPurchaseOrder = (poId: string, reason: string): boolean => {
     const po = purchaseOrders.find((entry) => entry.id === poId);
-    if (!po || !reason.trim() || !['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') || ['Delivered', 'Closed', 'Cancelled'].includes(po.status)) return false;
+    if (!po || (po.organizationId && po.organizationId !== currentOrganization.id) || !reason.trim() || !['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') || ['Delivered', 'Closed', 'Cancelled'].includes(po.status)) return false;
     const release = Math.max(0, po.totalAmount - po.paidAmount);
     setPurchaseOrders((prev) => prev.map((entry) => entry.id === poId ? { ...entry, status: 'Cancelled' } : entry));
     setDepartments((prev) => prev.map((entry) => entry.id === po.departmentId ? { ...entry, committed: Math.max(0, entry.committed - release) } : entry));
@@ -1474,7 +1474,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   ): { requiresAuthority: boolean; poCreated?: PurchaseOrder; blocked?: string } => {
     const tnd = tenders.find((t) => t.id === tenderId);
     const winBid = bids.find((b) => b.id === winningBidId);
-    if (!tnd || !winBid) return { requiresAuthority: false, blocked: 'Tender or bid not found.' };
+    if (!tnd || !winBid || (tnd.organizationId && tnd.organizationId !== currentOrganization.id)) return { requiresAuthority: false, blocked: 'Tender or bid not found in the active organization.' };
     if (tnd.status === 'Awarded' || tnd.awaitingAuthorityApproval) {
       return { requiresAuthority: false, blocked: 'This tender has already been awarded or is awaiting authority approval.' };
     }
@@ -1900,7 +1900,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (currentUser?.role !== 'Finance Officer' && !isSoloOwner) return null;
     const voucherNumber = nextRef('PV', payments.map((p) => p.voucherNumber));
     const po = purchaseOrders.find((p) => p.id === paymentData.purchaseOrderId);
-    if (!po) return null;
+    if (!po || (po.organizationId && po.organizationId !== currentOrganization.id)) return null;
     if (!canRecordPaymentRule(po, paymentData.amount)) return null;
 
     const newPayment: PaymentRecord = {
@@ -1991,7 +1991,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     reason?: string,
     targetOrgId?: string
   ) => {
-    if (!['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') || !reason?.trim()) return;
+    if (!['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') || !reason?.trim() || targetOrgId && targetOrgId !== currentOrganization.id) return;
     const orgId = targetOrgId || currentOrganization.id;
     setVendors((prev) =>
       prev.map((v) => {
@@ -2035,7 +2035,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Budget Adjustments
   const adjustBudget = (deptId: string, newBudget: number, reason: string) => {
     const dept = departments.find((d) => d.id === deptId);
-    if (!dept || !Number.isFinite(newBudget) || newBudget <= 0 || !reason.trim()) return;
+    if (!dept || (dept.organizationId && dept.organizationId !== currentOrganization.id) || !Number.isFinite(newBudget) || newBudget <= 0 || !reason.trim()) return;
     if (!['Finance Officer', 'Organization Admin'].includes(currentUser?.role || '')) return;
     if (newBudget < dept.spent + dept.committed) return;
 
@@ -2186,6 +2186,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const importDatabaseJson = (jsonStr: string): boolean => {
     try {
       const data = JSON.parse(jsonStr);
+      if (data.bidsRedacted) return false; // Refuse incomplete backups without changing any existing data.
       if (data.settings) setSettings(data.settings);
       if (data.departments) setDepartments(data.departments);
       if (data.users) setUsers(data.users);
@@ -2193,7 +2194,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (data.vendors) setVendors(data.vendors);
       if (data.requests) setRequests(data.requests);
       if (data.tenders) setTenders(data.tenders);
-      if (data.bidsRedacted) return false; // Never restore an incomplete backup that omitted confidential open-tender bids.
       if (data.bids && Array.isArray(data.bids)) setBids(data.bids);
       if (data.purchaseOrders) setPurchaseOrders(data.purchaseOrders);
       if (data.deliveries) setDeliveries(data.deliveries);
@@ -2216,12 +2216,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setInactivityModalOpen(false);
   };
 
-  const visibleBids = bids.filter((bid) => canViewBid(
-    bid,
-    tenders.find((tender) => tender.id === bid.tenderId),
-    currentUser?.role,
-    currentUser?.vendorId,
-  ));
+  const visibleBids = bids.filter((bid) => {
+    const tender = tenders.find((entry) => entry.id === bid.tenderId);
+    if (!tender || (tender.organizationId && tender.organizationId !== currentOrganization.id)) return false;
+    return canViewBid(bid, tender, currentUser?.role, currentUser?.vendorId);
+  });
 
   return (
     <AppContext.Provider
