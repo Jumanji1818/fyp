@@ -18,6 +18,7 @@ import { useApp } from '../../context/AppContext';
 import { StatusChip } from '../common/StatusChip';
 import { Modal } from '../common/Modal';
 import { VendorProfile } from '../../types';
+import { isSoloOwnerFlow } from '../../utils/procurementRules';
 
 export const VendorsDirectoryModule: React.FC = () => {
   const {
@@ -26,6 +27,7 @@ export const VendorsDirectoryModule: React.FC = () => {
     updateVendorStatus,
     getVendorEffectiveStatus,
     currentOrganization,
+    currentUser,
     bids,
     purchaseOrders,
     categories,
@@ -37,6 +39,7 @@ export const VendorsDirectoryModule: React.FC = () => {
   const [activeVendorId, setActiveVendorId] = useState<string | null>(null);
 
   const activeVendor = vendors.find((v) => v.id === activeVendorId) || null;
+  const canManageVendors = currentUser?.role === 'Procurement Officer' || isSoloOwnerFlow(currentOrganization.type, currentUser?.organizationId, currentOrganization.id);
   const activeEffectiveStatus = activeVendor ? getVendorEffectiveStatus(activeVendor) : { status: 'Approved' };
 
   // Suspend modal
@@ -182,6 +185,7 @@ export const VendorsDirectoryModule: React.FC = () => {
 
             <div className="mt-5 pt-3 border-t border-[#1F3A2D] flex items-center justify-between text-xs" onClick={(e) => e.stopPropagation()}>
               {/* My Vendors Toggle (Section 7.2: "A vendor can be added to My Vendors or removed") */}
+              {canManageVendors && (
               <button
                 onClick={() => toggleMyVendor(vendor.id)}
                 className={`px-3 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
@@ -193,9 +197,10 @@ export const VendorsDirectoryModule: React.FC = () => {
                 <ShieldCheck className="w-3.5 h-3.5" />
                 {vendor.inMyVendors ? 'In My Vendors' : 'Add to My Vendors'}
               </button>
+              )}
 
               <button
-                onClick={() => setActiveVendorId(vendor.id)}
+                onClick={() => setActiveVendorId(vendor.id)
                 className="text-[#D4AF37] hover:underline font-semibold text-[11px]"
               >
                 View Profile →
@@ -290,7 +295,7 @@ export const VendorsDirectoryModule: React.FC = () => {
 
             {/* Vendor Management Actions: Suspend / Blacklist / Reinstate (Section 7.2) */}
             <div className="flex items-center justify-between pt-3 border-t border-[#1F3A2D]">
-              <div className="flex gap-2">
+              {canManageVendors && <div className="flex gap-2">
                 {activeEffectiveStatus.status !== 'Suspended' ? (
                   <button
                     onClick={() => setSuspendModalOpen(true)}
@@ -322,10 +327,10 @@ export const VendorsDirectoryModule: React.FC = () => {
                     Remove from Blacklist
                   </button>
                 )}
-              </div>
+              </div>}
 
               <button
-                onClick={() => setActiveVendorId(null)}
+                onClick={() => setActiveVendorId(null)
                 className="px-4 py-2 rounded-lg bg-[#132A20] text-[#F2EFE6] hover:bg-[#1F3A2D]"
               >
                 Close Profile
