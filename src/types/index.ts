@@ -79,6 +79,7 @@ export interface User {
   vendorId?: string;
   status: 'Active' | 'Pending' | 'Deactivated';
   avatar?: string;
+  password?: string; // Local demo only; production authentication must use a server-side password hash.
   securityQuestion?: string;
   securityAnswer?: string;
   mustChangePassword?: boolean;
