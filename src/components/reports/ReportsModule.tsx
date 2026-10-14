@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { PrintViewModal, DocumentData } from '../common/PrintViewModal';
+import { serializeCsv, spendAnalysisRows, vendorPerformanceRows, deliveryPerformanceRows, tenderSummaryRows, budgetUtilizationRows, outstandingPaymentRows } from '../../utils/reporting';
 
 type ReportType =
   | 'spend_analysis'
@@ -47,11 +48,9 @@ export const ReportsModule: React.FC = () => {
     !!vendor.organizationStatuses?.[currentOrganization.id] || orgPOs.some((po) => po.vendorId === vendor.id)
   );
 
-  // Helper to trigger CSV download
+  // CSV exports are generated from the same organization-scoped records displayed in the report.
   const downloadCSV = (filename: string, rows: string[][]) => {
-    const csvContent =
-      'data:text/csv;charset=utf-8,' + encodeURIComponent(rows.map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\r\n'));
-    const encodedUri = csvContent;
+    const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(serializeCsv(rows));
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
     link.setAttribute('download', `${filename}.csv`);
@@ -62,64 +61,17 @@ export const ReportsModule: React.FC = () => {
 
   const handleExportCSV = () => {
     if (activeReport === 'spend_analysis') {
-      const rows = [
-        ['Payment Voucher', 'PO Reference', 'Vendor Name', 'Department', 'Amount (NGN)', 'Payment Date'],
-        ...orgPayments.map((p) => [
-          p.voucherNumber,
-          p.poReference,
-          p.vendorName,
-          p.departmentName,
-          p.amount.toString(),
-          p.paymentDate,
-        ]),
-      ];
-      downloadCSV(`Procura_Spend_Analysis_${currentOrganization.name.replace(/\s+/g, '_')}`, rows);
+      downloadCSV(`Procura_Spend_Analysis_${currentOrganization.name.replace(/\s+/g, '_')}`, spendAnalysisRows(orgPayments));
     } else if (activeReport === 'vendor_performance') {
-      const rows = [
-        ['Vendor Business Name', 'CAC Number', 'Reliability Score (%)', 'Total Orders', 'On Time Deliveries', 'Late Deliveries'],
-        ...orgVendors.map((v) => [
-          v.businessName,
-          v.cacNumber,
-          v.reliabilityScore.toString(),
-          v.totalOrders.toString(),
-          v.onTimeDeliveries.toString(),
-          v.lateDeliveries.toString(),
-        ]),
-      ];
-      downloadCSV(`Procura_Vendor_Performance_${currentOrganization.name.replace(/\s+/g, '_')}`, rows);
+      downloadCSV(`Procura_Vendor_Performance_${currentOrganization.name.replace(/\s+/g, '_')}`, vendorPerformanceRows(orgVendors));
     } else if (activeReport === 'delivery_performance') {
-      const rows = [
-        ['PO Reference', 'Vendor', 'Received By', 'Delivery Date', 'Timeliness', 'Late Days'],
-        ...orgDeliveries.map((d) => [
-          d.poReference, d.vendorName, d.receivedByName, d.receivedDate,
-          d.onTime ? 'On Time' : 'Late', d.lateDays.toString(),
-        ]),
-      ];
-      downloadCSV(`Procura_Delivery_Performance_${currentOrganization.name.replace(/\s+/g, '_')}`, rows);
+      downloadCSV(`Procura_Delivery_Performance_${currentOrganization.name.replace(/\s+/g, '_')}`, deliveryPerformanceRows(orgDeliveries));
     } else if (activeReport === 'tender_summary') {
-      const rows = [
-        ['Tender Reference', 'Title', 'Department', 'Status', 'Bid Closing Date/Time'],
-        ...orgTenders.map((t) => [t.referenceNumber, t.title, t.departmentName, t.status, t.bidClosingDateTime]),
-      ];
-      downloadCSV(`Procura_Tender_Summary_${currentOrganization.name.replace(/\s+/g, '_')}`, rows);
+      downloadCSV(`Procura_Tender_Summary_${currentOrganization.name.replace(/\s+/g, '_')}`, tenderSummaryRows(orgTenders));
     } else if (activeReport === 'outstanding_payments') {
-      const rows = [
-        ['PO Reference', 'Vendor', 'Department', 'PO Total (NGN)', 'Paid (NGN)', 'Outstanding (NGN)', 'PO Status'],
-        ...orgPOs.filter((po) => po.paidAmount < po.totalAmount && po.status !== 'Cancelled').map((po) => [
-          po.referenceNumber, po.vendorName, po.departmentName, po.totalAmount.toString(),
-          po.paidAmount.toString(), Math.max(0, po.totalAmount - po.paidAmount).toString(), po.status,
-        ]),
-      ];
-      downloadCSV(`Procura_Outstanding_Payments_${currentOrganization.name.replace(/\s+/g, '_')}`, rows);
+      downloadCSV(`Procura_Outstanding_Payments_${currentOrganization.name.replace(/\s+/g, '_')}`, outstandingPaymentRows(orgPOs));
     } else {
-      const rows = [
-        ['Department', 'Annual Budget (NGN)', 'Disbursed Spent (NGN)', 'Committed (NGN)', 'Remaining (NGN)'],
-        ...orgDepts.map((d) => [
-          d.name, d.annualBudget.toString(), d.spent.toString(), d.committed.toString(),
-          (d.annualBudget - d.spent - d.committed).toString(),
-        ]),
-      ];
-      downloadCSV(`Procura_Budget_Utilization_${currentOrganization.name.replace(/\s+/g, '_')}`, rows);
+      downloadCSV(`Procura_Budget_Utilization_${currentOrganization.name.replace(/\s+/g, '_')}`, budgetUtilizationRows(orgDepts));
     }
   };
 
