@@ -52,10 +52,8 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({
     currentOrganization,
   } = useApp();
 
-  // Allow Procurement Officer, Organization Admin, and Approving Authority to evaluate and award contracts
-  // (The Approving Authority only signs off high-value awards in its own screen - separation of duties)
-  const canAwardContract =
-    currentUser?.role === 'Procurement Officer' || currentUser?.role === 'Organization Admin';
+  // Procurement can recommend a winner; final award authority is enforced in AppContext.
+  const canAwardContract = currentUser?.role === 'Procurement Officer';
 
   // Closed tenders ready for evaluation or currently under evaluation for this organization
   const evaluatableTenders = tenders.filter(
