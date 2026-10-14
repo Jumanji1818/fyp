@@ -43,6 +43,10 @@ export const ReportsModule: React.FC = () => {
     orgPOs.some((po) => po.id === d.purchaseOrderId || po.referenceNumber === d.poReference)
   );
 
+  const orgVendors = vendors.filter((vendor) =>
+    !!vendor.organizationStatuses?.[currentOrganization.id] || orgPOs.some((po) => po.vendorId === vendor.id)
+  );
+
   // Helper to trigger CSV download
   const downloadCSV = (filename: string, rows: string[][]) => {
     const csvContent =
@@ -73,7 +77,7 @@ export const ReportsModule: React.FC = () => {
     } else if (activeReport === 'vendor_performance') {
       const rows = [
         ['Vendor Business Name', 'CAC Number', 'Reliability Score (%)', 'Total Orders', 'On Time Deliveries', 'Late Deliveries'],
-        ...vendors.map((v) => [
+        ...orgVendors.map((v) => [
           v.businessName,
           v.cacNumber,
           v.reliabilityScore.toString(),
@@ -82,7 +86,7 @@ export const ReportsModule: React.FC = () => {
           v.lateDeliveries.toString(),
         ]),
       ];
-      downloadCSV('Procura_Vendor_Performance_Report', rows);
+      downloadCSV(`Procura_Vendor_Performance_${currentOrganization.name.replace(/\s+/g, '_')}`, rows);
     } else if (activeReport === 'delivery_performance') {
       const rows = [
         ['PO Reference', 'Vendor', 'Received By', 'Delivery Date', 'Timeliness', 'Late Days'],
@@ -131,7 +135,7 @@ export const ReportsModule: React.FC = () => {
         { label: 'Organization Entity', value: currentOrganization.name },
         { label: 'Report Category', value: activeReport.replace(/_/g, ' ') },
         { label: 'Fiscal Currency', value: 'Nigerian Naira (NGN ₦)' },
-        { label: 'Records Included', value: activeReport === 'spend_analysis' ? String(orgPayments.length) : activeReport === 'tender_summary' ? String(orgTenders.length) : activeReport === 'delivery_performance' ? String(orgDeliveries.length) : activeReport === 'budget_utilization' ? String(orgDepts.length) : activeReport === 'outstanding_payments' ? String(orgPOs.filter((po) => po.paidAmount < po.totalAmount && po.status !== 'Cancelled').length) : String(vendors.length) },
+        { label: 'Records Included', value: activeReport === 'spend_analysis' ? String(orgPayments.length) : activeReport === 'tender_summary' ? String(orgTenders.length) : activeReport === 'delivery_performance' ? String(orgDeliveries.length) : activeReport === 'budget_utilization' ? String(orgDepts.length) : activeReport === 'outstanding_payments' ? String(orgPOs.filter((po) => po.paidAmount < po.totalAmount && po.status !== 'Cancelled').length) : String(orgVendors.length) },
       ],
     });
   };
@@ -248,7 +252,7 @@ export const ReportsModule: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1F3A2D]">
-                  {vendors.map((v) => (
+                  {orgVendors.map((v) => (
                     <tr key={v.id}>
                       <td className="py-2.5 px-3 font-semibold text-[#F2EFE6]">{v.businessName}</td>
                       <td className="py-2.5 px-3 font-mono text-[#A8B5AB]">{v.cacNumber}</td>
