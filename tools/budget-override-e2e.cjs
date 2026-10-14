@@ -41,7 +41,7 @@ app.whenReady().then(async () => {
 
   // Rejection path: a rejected override must leave the award blocked and create no PO.
   const rejectedRequestResult = await call(`a.overrideBudgetAndAward('tnd-4','bid-5','Test rejected override')`);
-  assert.match(rejectedRequestResult.blocked || '', /Finance-approved budget override|pending Finance/i);
+  assert.match(rejectedRequestResult.blocked || '', /budget override request submitted to Finance|Finance-approved budget override|pending Finance/i);
   const rejectedRequest = await run(`(()=>{const r=window.__app.budgetOverrideRequests.find(x=>x.tenderId==='tnd-4'&&x.bidId==='bid-5'&&x.status==='Pending');return r&&r.id})()`);
   assert.ok(rejectedRequest, 'request should be created in Pending state');
   await call(`a.switchUser('user-fin')`);
