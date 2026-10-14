@@ -1225,7 +1225,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const createTenderFromRequest = (requestId: string, tenderData: Partial<Tender>): Tender => {
     const req = requests.find((r) => r.id === requestId);
     const isSoloOwner = isSoloOwnerFlow(currentOrganization.type, currentUser?.organizationId, currentOrganization.id);
-    if (!req || req.organizationId !== currentOrganization.id || req.status !== 'Approved by Department') {
+    if (!req || (req.organizationId && req.organizationId !== currentOrganization.id) || req.status !== 'Approved by Department') {
       throw new Error('Only an approved request in the active organization can be published as a tender.');
     }
     if (!currentUser || (currentUser.role !== 'Procurement Officer' && currentUser.role !== 'Organization Admin' && !isSoloOwner)) {
