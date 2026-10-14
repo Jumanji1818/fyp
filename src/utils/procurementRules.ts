@@ -118,3 +118,7 @@ export function mergeAuditLogAppendOnly<T extends { id: string }>(existing: T[],
   const seen = new Set(existing.map((entry) => entry.id));
   return [...existing, ...imported.filter((entry) => !seen.has(entry.id))];
 }
+
+export function resolveBudgetOverride(status: 'Pending' | 'Approved' | 'Rejected', approved: boolean): 'Approved' | 'Rejected' | null {
+  return status === 'Pending' ? (approved ? 'Approved' : 'Rejected') : null;
+}
