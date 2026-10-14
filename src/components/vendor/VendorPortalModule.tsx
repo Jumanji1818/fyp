@@ -503,7 +503,7 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
                       className="px-3 py-1.5 rounded-lg bg-[#1F6F4A] hover:bg-[#14573A] text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-all shadow active:scale-95"
                       title="Print or Save official Purchase Order & Contract document"
                     >
-                      <Printer className="w-3.5 h-3.5 text-white" /> Print / Save PO
+                      <Printer className="w-3.5 h-3.5 text-white" /> Print / Save PDF
                     </button>
                   </div>
                 </div>
@@ -1070,7 +1070,7 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
                   onClick={() => openVendorPrintPO(viewingContractPO)}
                   className="px-3.5 py-2 rounded-lg bg-[#1F6F4A] hover:bg-[#14573A] text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow active:scale-95"
                 >
-                  <Printer className="w-3.5 h-3.5 text-white" /> Print / Save PO
+                  <Printer className="w-3.5 h-3.5 text-white" /> Print / Save PDF
                 </button>
               </div>
 
