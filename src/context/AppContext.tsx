@@ -1648,7 +1648,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const acceptedNow = po.items.map((it, idx) => {
       const rec = itemsReceived[idx];
       // Partial acceptance counts toward received quantity; rejected lines never do.
-      return rec && rec.status !== 'Rejected' ? Math.max(0, Math.min(rec.received, it.quantity)) : 0;
+      const outstanding = Math.max(0, it.quantity - (it.receivedQuantity || 0));
+      return rec && rec.status !== 'Rejected' ? Math.max(0, Math.min(rec.received, outstanding)) : 0;
     });
     const newReceived = po.items.map((it, idx) => Math.min(it.quantity, (it.receivedQuantity || 0) + acceptedNow[idx]));
     const isFull = po.items.every((it, idx) => newReceived[idx] >= it.quantity);
@@ -1672,9 +1673,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       isFullyDelivered: isFull,
       onTime: isOnTime,
       lateDays,
+      resolutionStatus: hasRejectedItems ? 'Pending' : undefined,
     };
 
-    setDeliveries((prev) => [newDelivery, ...prev]);
+    setDeliveries((prev) => [
+      newDelivery,
+      ...prev.map((delivery) =>
+        delivery.purchaseOrderId === poId && delivery.resolutionStatus === 'Pending' && isFull
+          ? { ...delivery, resolutionStatus: 'Resolved' as const, resolutionNotes: `Outstanding quantities were accepted during reinspection on ${todayStr}.` }
+          : delivery
+      ),
+    ]);
 
     // Update PO status
     setPurchaseOrders((prev) =>
