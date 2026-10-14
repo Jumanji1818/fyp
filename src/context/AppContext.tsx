@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { appStorage } from '../utils/storage';
 import { createPasswordRecord, verifyPassword, validatePassword, generateTempPassword, normalizeAnswer, LoginLockout } from '../utils/password';
-import { BID_EVALUATOR_ROLES, canViewBid, canCommitBudget, approvalRequiresAuthority, canRecordPayment as canRecordPaymentRule, applyAcceptedDelivery, calculateReliabilityScore, calculateWeightedScores } from '../utils/procurementRules';
+import { BID_EVALUATOR_ROLES, canViewBid, canCommitBudget, approvalRequiresAuthority, canRecordPayment as canRecordPaymentRule, applyAcceptedDelivery, calculateReliabilityScore, calculateWeightedScores, resolveBudgetOverride } from '../utils/procurementRules';
 import {
   Organization,
   OrganizationType,
@@ -1720,8 +1720,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const decideBudgetOverride = (requestId: string, approved: boolean, comment: string) => {
     const request = budgetOverrideRequests.find((entry) => entry.id === requestId);
-    if (!request || request.status !== 'Pending' || currentUser?.role !== 'Finance Officer' || !comment.trim()) return;
-    const status: BudgetOverrideRequest['status'] = approved ? 'Approved' : 'Rejected';
+    if (!request || currentUser?.role !== 'Finance Officer' || !comment.trim()) return;
+    const status = resolveBudgetOverride(request.status, approved);
+    if (!status) return;
     setBudgetOverrideRequests((prev) => prev.map((entry) => entry.id === requestId ? {
       ...entry, status, financeComment: comment.trim(), decidedByUserId: currentUser.id,
       decidedByName: currentUser.fullName, decidedAt: new Date().toISOString(),
