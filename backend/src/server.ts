@@ -508,6 +508,20 @@ app.post('/api/records', requireAuth, requireOrganization, async (req, res, next
   const parsed = recordSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Invalid procurement record.', issues: parsed.error.issues });
   const { recordType, referenceNumber, status, data } = parsed.data;
+  const initialStatuses: Record<string, string[]> = {
+    request: ['Draft', 'Submitted'],
+    tender: ['Draft'],
+    bid: ['Submitted'],
+    purchase_order: ['Draft'],
+    delivery: ['Pending'],
+    payment: ['Pending'],
+    vendor: ['Registered'],
+    award: ['Pending Approval'],
+    notification: ['Unread'],
+  };
+  if (!initialStatuses[recordType]?.includes(status)) {
+    return res.status(400).json({ error: `A new ${recordType.replace('_', ' ')} cannot start in "${status}". Use the authorized workflow transition endpoint.` });
+  }
   const rolePermissions: Record<string, Role[]> = {
     request: ['Organization Admin','Request Officer'],
     tender: ['Organization Admin','Procurement Officer'],
@@ -536,6 +550,85 @@ app.post('/api/records', requireAuth, requireOrganization, async (req, res, next
     await pool.query('INSERT INTO audit_events(organization_id,actor_user_id,action,entity_type,entity_id,details) VALUES($1,$2,$3,$4,$5,$6)',
       [req.user!.organizationId,req.user!.id,'record.created',recordType,result.rows[0].id,JSON.stringify({ referenceNumber: referenceNumber || null })]);
     return res.status(201).json({ record: result.rows[0] });
+  } catch (error) { return next(error); }
+});
+
+const transitionSchema = z.object({
+  nextStatus: z.string().trim().min(1).max(80),
+  reason: z.string().trim().max(2000).optional(),
+});
+
+// State changes are server-authorized. Clients cannot skip directly to approval, award, or payment.
+app.patch('/api/records/:recordId/transition', requireAuth, requireOrganization, async (req, res, next) => {
+  const recordId = typeof req.params.recordId === 'string' ? req.params.recordId : '';
+  const parsed = transitionSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'A valid next status is required.' });
+  const transitions: Record<string, Record<string, { to: string; roles: Role[] }[]>> = {
+    request: {
+      Draft: [{ to: 'Submitted', roles: ['Request Officer','Organization Admin'] }],
+      Submitted: [
+        { to: 'Approved by Department', roles: ['Department Head','Organization Admin'] },
+        { to: 'Returned', roles: ['Department Head','Organization Admin'] },
+        { to: 'Rejected', roles: ['Department Head','Organization Admin'] },
+      ],
+      Returned: [{ to: 'Submitted', roles: ['Request Officer','Organization Admin'] }],
+      'Approved by Department': [{ to: 'Procurement Review', roles: ['Procurement Officer','Organization Admin'] }],
+    },
+    tender: {
+      Draft: [{ to: 'Open for Bidding', roles: ['Procurement Officer','Organization Admin'] }],
+      'Open for Bidding': [{ to: 'Under Evaluation', roles: ['Procurement Officer','Organization Admin'] }, { to: 'Cancelled', roles: ['Procurement Officer','Organization Admin'] }],
+      'Under Evaluation': [{ to: 'Pending Award Approval', roles: ['Procurement Officer','Organization Admin'] }],
+      'Pending Award Approval': [{ to: 'Awarded', roles: ['Approving Authority','Organization Admin'] }, { to: 'Under Evaluation', roles: ['Approving Authority','Organization Admin'] }],
+    },
+    bid: {
+      Submitted: [{ to: 'Compliance Passed', roles: ['Procurement Officer','Organization Admin'] }, { to: 'Compliance Failed', roles: ['Procurement Officer','Organization Admin'] }],
+      'Compliance Passed': [{ to: 'Technically Evaluated', roles: ['Department Head','Organization Admin'] }],
+      'Technically Evaluated': [{ to: 'Recommended', roles: ['Procurement Officer','Organization Admin'] }, { to: 'Rejected', roles: ['Department Head','Organization Admin'] }],
+      Recommended: [{ to: 'Awarded', roles: ['Approving Authority','Organization Admin'] }, { to: 'Rejected', roles: ['Approving Authority','Organization Admin'] }],
+    },
+    purchase_order: {
+      Draft: [{ to: 'Issued', roles: ['Procurement Officer','Organization Admin'] }],
+      Issued: [{ to: 'Acknowledged', roles: ['Procurement Officer','Organization Admin'] }],
+      Acknowledged: [{ to: 'Delivery in Progress', roles: ['Procurement Officer','Organization Admin'] }],
+      'Delivery in Progress': [{ to: 'Delivered', roles: ['Procurement Officer','Organization Admin'] }],
+      Delivered: [{ to: 'Paid', roles: ['Finance Officer','Organization Admin'] }],
+    },
+    delivery: {
+      Pending: [{ to: 'Dispatched', roles: ['Procurement Officer','Organization Admin'] }],
+      Dispatched: [{ to: 'Received', roles: ['Procurement Officer','Organization Admin'] }],
+    },
+    payment: {
+      Pending: [{ to: 'Approved', roles: ['Finance Officer','Organization Admin'] }],
+      Approved: [{ to: 'Paid', roles: ['Finance Officer','Organization Admin'] }],
+    },
+    vendor: {
+      Registered: [{ to: 'Approved', roles: ['Organization Admin'] }, { to: 'Suspended', roles: ['Organization Admin'] }],
+      Approved: [{ to: 'Suspended', roles: ['Organization Admin'] }],
+      Suspended: [{ to: 'Approved', roles: ['Organization Admin'] }],
+    },
+    award: {
+      'Pending Approval': [{ to: 'Approved', roles: ['Approving Authority','Organization Admin'] }, { to: 'Rejected', roles: ['Approving Authority','Organization Admin'] }],
+    },
+  };
+  try {
+    const result = await pool.query(
+      'SELECT id,organization_id,record_type,status,data,created_by FROM procurement_records WHERE id = $1 AND organization_id = $2 FOR UPDATE',
+      [recordId, req.user!.organizationId],
+    );
+    if (!result.rowCount) return res.status(404).json({ error: 'Record not found in your organization.' });
+    const record = result.rows[0];
+    const possible = transitions[String(record.record_type)]?.[String(record.status)] || [];
+    const transition = possible.find((item) => item.to === parsed.data.nextStatus && item.roles.includes(req.user!.role));
+    if (!transition) return res.status(403).json({ error: 'This status transition is not permitted for your role or the current record state.' });
+    const updated = await pool.query(
+      'UPDATE procurement_records SET status = $1, data = CASE WHEN $2::text IS NULL THEN data ELSE data || jsonb_build_object(\'transitionReason\',$2::text) END WHERE id = $3 AND organization_id = $4 RETURNING id,organization_id,record_type,reference_number,status,data,created_by,created_at,updated_at',
+      [parsed.data.nextStatus, parsed.data.reason || null, recordId, req.user!.organizationId],
+    );
+    await pool.query(
+      'INSERT INTO audit_events(organization_id,actor_user_id,action,entity_type,entity_id,details) VALUES($1,$2,$3,$4,$5,$6)',
+      [req.user!.organizationId, req.user!.id, 'record.status_changed', String(record.record_type), recordId, JSON.stringify({ from: record.status, to: parsed.data.nextStatus, reason: parsed.data.reason || null })],
+    );
+    return res.json({ record: updated.rows[0] });
   } catch (error) { return next(error); }
 });
 
