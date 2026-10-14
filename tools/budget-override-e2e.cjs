@@ -36,7 +36,7 @@ app.whenReady().then(async () => {
   };
   await call(`a.switchUser('user-admin')`);
   const constrainedBudget = initial.department.spent + initial.department.committed + 1;
-  await call(`a.adjustBudget('dept-works', ${constrainedBudget}, 'Automated budget override test')`);
+  await call(`a.adjustBudget(${JSON.stringify(initial.tender.departmentId)}, ${constrainedBudget}, 'Automated budget override test')`);
   await call(`a.switchUser('user-proc')`);
 
   // Rejection path: a rejected override must leave the award blocked and create no PO.
