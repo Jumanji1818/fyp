@@ -43,6 +43,21 @@ CREATE TABLE IF NOT EXISTS users (
   FOREIGN KEY (organization_id, department_id) REFERENCES departments(organization_id, id)
 );
 
+CREATE TABLE IF NOT EXISTS vendor_profiles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_name text NOT NULL,
+  business_type text NOT NULL DEFAULT 'business',
+  email text NOT NULL,
+  phone text NOT NULL DEFAULT '',
+  description text NOT NULL DEFAULT '',
+  categories jsonb NOT NULL DEFAULT '[]'::jsonb,
+  subcategories jsonb NOT NULL DEFAULT '[]'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS vendor_profiles_email_lower_unique ON vendor_profiles(lower(email));
+ALTER TABLE users ADD CONSTRAINT users_vendor_id_fk
+  FOREIGN KEY (vendor_id) REFERENCES vendor_profiles(id) ON DELETE SET NULL;
+
 CREATE TABLE IF NOT EXISTS sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
