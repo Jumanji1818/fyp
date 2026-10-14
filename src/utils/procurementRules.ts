@@ -122,3 +122,16 @@ export function mergeAuditLogAppendOnly<T extends { id: string }>(existing: T[],
 export function resolveBudgetOverride(status: 'Pending' | 'Approved' | 'Rejected', approved: boolean): 'Approved' | 'Rejected' | null {
   return status === 'Pending' ? (approved ? 'Approved' : 'Rejected') : null;
 }
+
+export function canVendorBid(status: string): boolean {
+  return status === 'Approved';
+}
+
+export function remainingCommitmentAfterCancellation(totalAmount: number, paidAmount: number): number {
+  if (![totalAmount, paidAmount].every(Number.isFinite)) return 0;
+  return Math.max(0, totalAmount - Math.max(0, paidAmount));
+}
+
+export function isSoloOwnerFlow(organizationType: string, userOrganizationId?: string, activeOrganizationId?: string): boolean {
+  return organizationType === 'sole_proprietorship' && !!userOrganizationId && userOrganizationId === activeOrganizationId;
+}
