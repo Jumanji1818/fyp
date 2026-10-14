@@ -27,10 +27,11 @@ Never commit `.env` or production database credentials. Production deployments m
 - `POST /api/auth/change-password`
 - `POST /api/auth/staff` — organization-admin-only staff provisioning.
 - `GET /api/organizations/current`
-- `GET /api/records/:recordType`, `POST /api/records`
+- `GET /api/records/:recordType`, `POST /api/records` (only permitted initial states)
+- `PATCH /api/records/:recordId/transition` (server-side role and state transition checks)
 
 Authentication uses an HttpOnly session cookie; session tokens are stored as SHA-256 digests in PostgreSQL. Passwords are bcrypt-hashed with cost 12. Authorization is checked by the API, not by UI visibility.
 
 ## Scope and limitations of this first increment
 
-This is a backend foundation, not yet a complete application migration. Procurement records currently use a typed record envelope with JSONB payloads while organizations, departments, users, sessions, and audit events have relational tables. Full approval and procurement state machines, password recovery email delivery, CSRF protection for cross-site deployments, and the frontend's AppContext-to-API integration are subsequent required steps. Vendor registration and tender/bid API endpoints are present, but still need integration and end-to-end tests. Do not treat the existing localStorage demo as production-ready until those are completed and tested.
+This is a backend foundation, not yet a complete application migration. Procurement records currently use a typed record envelope with JSONB payloads while organizations, departments, users, sessions, and audit events have relational tables. The API now rejects attempts to create records directly in approval, award, paid, or other non-initial states and exposes a role-checked transition endpoint for request, tender, bid, purchase order, delivery, payment, vendor, and award statuses. This is a baseline workflow guard, not yet a complete normalized procurement model. Password recovery email delivery, CSRF protection for cross-site deployments, full frontend workflow migration, and end-to-end tests remain outstanding. Vendor registration and tender/bid endpoints still need full UI integration and end-to-end tests. Do not treat the existing localStorage demo as production-ready until those are completed and tested.
