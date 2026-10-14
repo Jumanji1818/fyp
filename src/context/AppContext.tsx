@@ -1307,7 +1307,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       ref,
       `Request: ${req?.referenceNumber}`,
       'Status: Open',
-      `Auto-notified ${matchingVendors.length} registered vendors matching categories: ${targetCats.join(', ')}`
+      `Auto-notified ${matchingVendors.length} Procurement-approved vendors matching categories: ${targetCats.join(', ')}`
     );
 
     return newTender;
