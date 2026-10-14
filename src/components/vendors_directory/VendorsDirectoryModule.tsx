@@ -207,7 +207,7 @@ export const VendorsDirectoryModule: React.FC = () => {
               )}
 
               <button
-                onClick={() => setActiveVendorId(vendor.id)
+                onClick={() => setActiveVendorId(vendor.id)}
                 className="text-[#D4AF37] hover:underline font-semibold text-[11px]"
               >
                 View Profile →
@@ -344,7 +344,7 @@ export const VendorsDirectoryModule: React.FC = () => {
               </div>}
 
               <button
-                onClick={() => setActiveVendorId(null)
+                onClick={() => setActiveVendorId(null)}
                 className="px-4 py-2 rounded-lg bg-[#132A20] text-[#F2EFE6] hover:bg-[#1F3A2D]"
               >
                 Close Profile
