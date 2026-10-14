@@ -4,10 +4,10 @@ export function serializeCsv(rows: (string | number)[][]): string {
   const escapeCell = (value: string | number): string => {
     const raw = String(value);
     // Prefix spreadsheet formula-like text; CSV quoting alone does not stop Excel/LibreOffice formula execution.
-    const safe = typeof value === 'string' && /^[\\s\\u0000-\\u001F]*[=+@-]/.test(raw) ? `'${raw}` : raw;
+    const safe = typeof value === 'string' && /^[\s\u0000-\u001F]*[=+@-]/.test(raw) ? `'${raw}` : raw;
     return `"${safe.replace(/"/g, '""')}"`;
   };
-  return rows.map((row) => row.map(escapeCell).join(',')).join('\\r\\n');
+  return rows.map((row) => row.map(escapeCell).join(',')).join('\r\n');
 }
 
 export function spendAnalysisRows(payments: PaymentRecord[]): string[][] {
