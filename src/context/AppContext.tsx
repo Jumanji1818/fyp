@@ -475,14 +475,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [currentOrganization?.id]
   );
 
+  const canCurrentUserSeeNotification = (notification: NotificationItem) => {
+    if (notification.userId) return notification.userId === currentUser?.id;
+    if (notification.organizationId && notification.organizationId !== currentOrganization.id) return false;
+    return !notification.forRole || notification.forRole === currentUser?.role;
+  };
+
   const markNotificationRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+    setNotifications((prev) => prev.map((notification) =>
+      notification.id === id && canCurrentUserSeeNotification(notification) ? { ...notification, read: true } : notification
+    ));
   };
 
   const markAllNotificationsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setNotifications((prev) => prev.map((notification) =>
+      canCurrentUserSeeNotification(notification) ? { ...notification, read: true } : notification
+    ));
   };
 
   // Auth, Organization & Staff Provisioning
@@ -1711,7 +1719,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const dept = tender && departments.find((d) => d.id === tender.departmentId);
     if (!tender || !bid || !dept) return { requiresAuthority: false, blocked: 'Tender, bid, or department not found.' };
     const isSoloOwner = isSoloOwnerFlow(currentOrganization.type, currentUser?.organizationId, currentOrganization.id);
-    if (currentUser?.role !== 'Procurement Officer' && !isSoloOwner) {
+    if (!currentUser || (currentUser.role !== 'Procurement Officer' && !isSoloOwner)) {
       return { requiresAuthority: false, blocked: 'Only the Procurement Officer can submit a budget override request.' };
     }
     if (!overrideReason.trim()) return { requiresAuthority: false, blocked: 'A reason is required for the Finance override request.' };
@@ -1739,7 +1747,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setBudgetOverrideRequests((prev) => [request, ...prev]);
     addAuditLog('Budget Override Requested', tender.referenceNumber, `Remaining budget: ₦${remaining.toLocaleString()}`, `Requested award: ₦${bid.totalAmount.toLocaleString()}`, request.reason);
     addNotification({
-      forRole: 'Finance Officer',
+      forRole: isSoloOwner ? undefined : 'Finance Officer',
+      userId: isSoloOwner ? currentUser.id : undefined,
       title: 'Budget Override Request',
       message: `${currentUser.fullName} requests a budget override for ${tender.referenceNumber}. Finance approval is required before award.`,
       type: 'warning',
@@ -1761,22 +1770,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const decideBudgetOverride = (requestId: string, approved: boolean, comment: string) => {
     const request = budgetOverrideRequests.find((entry) => entry.id === requestId);
     const isSoloOwner = isSoloOwnerFlow(currentOrganization.type, currentUser?.organizationId, currentOrganization.id);
-    if (!request || request.organizationId !== currentOrganization.id || (currentUser?.role !== 'Finance Officer' && !isSoloOwner) || !comment.trim()) return;
+    if (!request || !currentUser || request.organizationId !== currentOrganization.id || (currentUser.role !== 'Finance Officer' && !isSoloOwner) || !comment.trim()) return;
     const status = resolveBudgetOverride(request.status, approved);
     if (!status) return;
     setBudgetOverrideRequests((prev) => prev.map((entry) => entry.id === requestId ? {
       ...entry, status, financeComment: comment.trim(), decidedByUserId: currentUser.id,
       decidedByName: currentUser.fullName, decidedAt: new Date().toISOString(),
     } : entry));
-    addAuditLog(approved ? 'Budget Override Approved by Finance' : 'Budget Override Rejected by Finance',
-      request.tenderReference, 'Pending Finance Decision', status, comment.trim());
+    addAuditLog(
+      approved ? (isSoloOwner ? 'Budget Override Approved by Sole Proprietor' : 'Budget Override Approved by Finance') : (isSoloOwner ? 'Budget Override Rejected by Sole Proprietor' : 'Budget Override Rejected by Finance'),
+      request.tenderReference, 'Pending Finance Decision', status, comment.trim(),
+    );
     addNotification({
       forRole: 'Procurement Officer',
       userId: request.requestedByUserId,
       title: approved ? 'Budget Override Approved' : 'Budget Override Rejected',
       message: approved
-        ? `Finance approved the override for ${request.tenderReference}. Return to evaluation to continue the award; Authority sign-off still applies where required.`
-        : `Finance rejected the override for ${request.tenderReference}: ${comment.trim()}. The award remains blocked.`,
+        ? `${isSoloOwner ? 'The sole proprietor approved' : 'Finance approved'} the override for ${request.tenderReference}. Return to evaluation to continue the award; Authority sign-off still applies where required.`
+        : `${isSoloOwner ? 'The sole proprietor rejected' : 'Finance rejected'} the override for ${request.tenderReference}: ${comment.trim()}. The award remains blocked.`,
       type: approved ? 'success' : 'danger',
       recordType: 'tender',
       recordId: request.tenderId,
@@ -2257,7 +2268,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (data.deliveries) setDeliveries(data.deliveries);
       if (data.payments) setPayments(data.payments);
       if (data.notifications) setNotifications(data.notifications);
-      if (data.budgetOverrideRequests && Array.isArray(data.budgetOverrideRequests)) setBudgetOverrideRequests(data.budgetOverrideRequests.map((request: BudgetOverrideRequest) => ({ ...request, status: 'Pending', financeComment: undefined, decidedByUserId: undefined, decidedByName: undefined, decidedAt: undefined })));
+      if (data.budgetOverrideRequests && Array.isArray(data.budgetOverrideRequests)) setBudgetOverrideRequests(data.budgetOverrideRequests.map((request: BudgetOverrideRequest) => ({ ...request, status: 'Pending' as const, financeComment: undefined, decidedByUserId: undefined, decidedByName: undefined, decidedAt: undefined })));
       // Audit history is intentionally excluded from imports; only audited application actions may append entries.
       return true;
     } catch {
