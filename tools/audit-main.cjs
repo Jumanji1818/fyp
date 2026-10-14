@@ -1,5 +1,5 @@
 // Dev-only audit harness (not shipped): drives the real app through every role and screen.
-const { app, BrowserWindow, protocol, net } = require('electron');
+const { app, BrowserWindow, protocol, net, session } = require('electron');
 const path = require('path'); const fs = require('fs'); const { pathToFileURL } = require('url');
 require('./dbstub.cjs');
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
@@ -12,6 +12,11 @@ app.whenReady().then(async () => {
   const win = new BrowserWindow({ width: 1366, height: 820, show: false, webPreferences: { preload: path.join(__dirname, '..', 'electron', 'preload.cjs'), contextIsolation: true } });
   const report = [];
   const consoleErrs = [];
+  const externalRequests = [];
+  session.defaultSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (details, callback) => {
+    externalRequests.push(details.url);
+    callback({ cancel: true });
+  });
   win.webContents.on('console-message', (_e, level, msg) => { if (level >= 2 && !/Electron Security Warning/.test(msg)) consoleErrs.push(msg.slice(0, 300)); });
   await win.loadURL('app://procura/index.html'); await sleep(4500);
   const run = (code) => win.webContents.executeJavaScript(code, true);
@@ -48,8 +53,8 @@ app.whenReady().then(async () => {
   }
   fs.writeFileSync('/tmp/audit.json', JSON.stringify({ report, consoleErrs }, null, 2));
   const failures = report.filter((entry) => !entry.loggedIn || !entry.nav?.length || entry.tabs.some((tab) => tab.suspiciousText || tab.newConsoleErrors.length));
-  console.log('AUDIT SUMMARY', JSON.stringify({ users: report.length, loggedIn: report.filter((entry) => entry.loggedIn).length, screens: report.reduce((n, entry) => n + entry.tabs.length, 0), consoleErrors: consoleErrs.length, failures: failures.map((entry) => ({ email: entry.email, note: entry.note, suspicious: entry.tabs.filter((tab) => tab.suspiciousText).map((tab) => tab.label) })) }));
-  if (failures.length || consoleErrs.length) { console.error('AUDIT FAILED'); process.exitCode = 1; }
+  console.log('AUDIT SUMMARY', JSON.stringify({ users: report.length, loggedIn: report.filter((entry) => entry.loggedIn).length, screens: report.reduce((n, entry) => n + entry.tabs.length, 0), consoleErrors: consoleErrs.length, externalRequests, failures: failures.map((entry) => ({ email: entry.email, note: entry.note, suspicious: entry.tabs.filter((tab) => tab.suspiciousText).map((tab) => tab.label) })) }));
+  if (failures.length || consoleErrs.length || externalRequests.length) { console.error('AUDIT FAILED'); process.exitCode = 1; }
   else console.log('AUDIT DONE');
   app.quit();
 }).catch((error) => { console.error('ROLE/SREEN AUDIT CRASHED', error); process.exitCode = 1; app.quit(); });

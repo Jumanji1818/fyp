@@ -41,7 +41,7 @@ The unit tests run with `npm test` before the Windows packaging step in the rele
 | TypeScript | `npx tsc --noEmit` | PASS |
 | Unit tests | `npm test` | PASS (23 tests) |
 | Desktop build | `npm run build:desktop` | PASS |
-| Electron role and screen audit | `xvfb-run -a npx electron tools/audit-main.cjs --no-sandbox` | PASS |
+| Electron role, screen, and external-request audit | `xvfb-run -a npx electron tools/audit-main.cjs --no-sandbox` | PASS for role/screens in run #9; network-request assertion added after run #9, pending next run |
 | Budget override + Authority workflow | `xvfb-run -a npx electron tools/budget-override-e2e.cjs --no-sandbox` | Added after run #9; pending next CI run |
 | Award approval workflow | `xvfb-run -a npx electron tools/award-e2e.cjs --no-sandbox` | PASS in run #9 |
 | PDF output | `xvfb-run -a npx electron tools/pdf-test.cjs --no-sandbox` | PASS |
