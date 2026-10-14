@@ -22,7 +22,7 @@ const cookieSecure = process.env.COOKIE_SECURE === 'true' || process.env.NODE_EN
 const frontendOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
 
 type Role = 'Platform Admin' | 'Organization Admin' | 'Request Officer' | 'Department Head' | 'Procurement Officer' | 'Finance Officer' | 'Approving Authority' | 'Vendor';
-type SessionUser = { id: string; organizationId: string | null; departmentId: string | null; fullName: string; email: string; role: Role; status: string; mustChangePassword: boolean };
+type SessionUser = { id: string; organizationId: string | null; departmentId: string | null; vendorId: string | null; fullName: string; email: string; role: Role; status: string; mustChangePassword: boolean };
 declare global {
   namespace Express { interface Request { user?: SessionUser; sessionId?: string } }
 }
@@ -58,6 +58,7 @@ function publicUser(row: Record<string, unknown>): SessionUser {
   return {
     id: String(row.id), organizationId: row.organization_id ? String(row.organization_id) : null,
     departmentId: row.department_id ? String(row.department_id) : null,
+    vendorId: row.vendor_id ? String(row.vendor_id) : null,
     fullName: String(row.full_name), email: String(row.email), role: row.role as Role,
     status: String(row.status), mustChangePassword: Boolean(row.must_change_password),
   };
@@ -124,6 +125,16 @@ const registerSchema = z.object({
     phone: z.string().trim().min(5).max(40),
     password: z.string().min(8).max(200),
   }),
+});
+const registerVendorSchema = z.object({
+  businessName: z.string().trim().min(2).max(160),
+  businessType: z.string().trim().min(2).max(100).default('business'),
+  email: z.string().email().max(254),
+  phone: z.string().trim().min(5).max(40),
+  description: z.string().trim().max(2000).default(''),
+  categories: z.array(z.string().trim().min(1).max(100)).max(3).default([]),
+  subcategories: z.array(z.string().trim().min(1).max(100)).max(100).default([]),
+  password: z.string().min(8).max(200),
 });
 const staffSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
@@ -252,6 +263,133 @@ app.post('/api/auth/register-organization', async (req, res, next) => {
     );
     await client.query('COMMIT');
     return res.status(201).json({ organization: org.rows[0], user: publicUser(user.rows[0]), message: 'Registration received and awaiting approval.' });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    return next(error);
+  } finally { client.release(); }
+});
+
+app.post('/api/auth/register-vendor', async (req, res, next) => {
+  const parsed = registerVendorSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid vendor registration details.', issues: parsed.error.issues });
+  const input = parsed.data;
+  const email = normalizeEmail(input.email);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const existing = await client.query(
+      'SELECT 1 FROM users WHERE lower(email) = $1 UNION ALL SELECT 1 FROM vendor_profiles WHERE lower(email) = $1 LIMIT 1',
+      [email],
+    );
+    if (existing.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'An account already uses this email address.' });
+    }
+    const vendor = await client.query(
+      `INSERT INTO vendor_profiles(business_name,business_type,email,phone,description,categories,subcategories)
+       VALUES($1,$2,$3,$4,$5,$6,$7)
+       RETURNING id,business_name,business_type,email,phone,description,categories,subcategories,created_at`,
+      [input.businessName,input.businessType,email,input.phone,input.description,JSON.stringify(input.categories),JSON.stringify(input.subcategories)],
+    );
+    const passwordHash = await hashPassword(input.password);
+    const user = await client.query(
+      `INSERT INTO users(organization_id,vendor_id,full_name,email,phone,password_hash,role,status)
+       VALUES(NULL,$1,$2,$3,$4,$5,'Vendor','active')
+       RETURNING id,organization_id,department_id,vendor_id,full_name,email,phone,role,status,must_change_password,created_at`,
+      [vendor.rows[0].id,input.businessName,email,input.phone,passwordHash],
+    );
+    await client.query(
+      "INSERT INTO audit_events(actor_user_id,action,entity_type,entity_id,details) VALUES($1,'vendor.registered','vendor',$2,$3)",
+      [user.rows[0].id,vendor.rows[0].id,JSON.stringify({ categories: input.categories })],
+    );
+    await client.query('COMMIT');
+    return res.status(201).json({ vendor: vendor.rows[0], user: publicUser(user.rows[0]), message: 'Vendor account created successfully.' });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    return next(error);
+  } finally { client.release(); }
+});
+
+app.get('/api/vendor/opportunities', requireAuth, allowRoles('Vendor'), async (_req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT r.id,r.organization_id,o.name AS organization_name,r.reference_number,r.status,r.data,r.created_at,r.updated_at
+       FROM procurement_records r
+       JOIN organizations o ON o.id = r.organization_id AND o.status = 'active'
+       WHERE r.record_type = 'tender' AND r.status IN ('Open','Open for Bidding')
+       ORDER BY r.created_at DESC LIMIT 500`,
+    );
+    return res.json({ opportunities: result.rows });
+  } catch (error) { return next(error); }
+});
+
+const vendorBidSchema = z.object({
+  tenderId: z.string().uuid(),
+  amount: z.number().positive().max(999999999999),
+  proposal: z.string().trim().min(10).max(5000),
+  deliveryTimelineDays: z.number().int().positive().max(3650),
+});
+app.post('/api/vendor/bids', requireAuth, allowRoles('Vendor'), async (req, res, next) => {
+  const parsed = vendorBidSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid bid details.', issues: parsed.error.issues });
+  if (!req.user!.vendorId) return res.status(403).json({ error: 'This account has no vendor profile.' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const tender = await client.query(
+      `SELECT r.id,r.organization_id,r.reference_number,r.data,o.name AS organization_name
+       FROM procurement_records r JOIN organizations o ON o.id = r.organization_id
+       WHERE r.id = $1 AND r.record_type = 'tender' AND r.status IN ('Open','Open for Bidding')
+         AND o.status = 'active' FOR SHARE OF r`,
+      [parsed.data.tenderId],
+    );
+    if (!tender.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'This tender is not currently open for bidding.' });
+    }
+    const duplicate = await client.query(
+      "SELECT 1 FROM procurement_records WHERE record_type = 'bid' AND data->>'tenderId' = $1 AND data->>'vendorId' = $2 LIMIT 1",
+      [parsed.data.tenderId,req.user!.vendorId],
+    );
+    if (duplicate.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Your business has already submitted a bid for this tender.' });
+    }
+    const profile = await client.query(
+      'SELECT business_name,email,phone,categories,subcategories,description FROM vendor_profiles WHERE id = $1',
+      [req.user!.vendorId],
+    );
+    if (!profile.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Vendor profile not found.' });
+    }
+    const tenderRow = tender.rows[0];
+    const vendorRow = profile.rows[0];
+    const bidData = {
+      tenderId: parsed.data.tenderId,
+      vendorId: req.user!.vendorId,
+      vendorName: vendorRow.business_name,
+      vendorEmail: vendorRow.email,
+      vendorPhone: vendorRow.phone,
+      vendorCategories: vendorRow.categories,
+      vendorSubcategories: vendorRow.subcategories,
+      vendorDescription: vendorRow.description,
+      amount: parsed.data.amount,
+      proposal: parsed.data.proposal,
+      deliveryTimelineDays: parsed.data.deliveryTimelineDays,
+    };
+    const created = await client.query(
+      `INSERT INTO procurement_records(organization_id,record_type,reference_number,status,data,created_by)
+       VALUES($1,'bid',$2,'Submitted',$3,$4)
+       RETURNING id,organization_id,record_type,reference_number,status,data,created_by,created_at,updated_at`,
+      [tenderRow.organization_id, `BID-${req.user!.vendorId.slice(0,8)}-${parsed.data.tenderId.slice(0,8)}`,JSON.stringify(bidData),req.user!.id],
+    );
+    await client.query(
+      'INSERT INTO audit_events(organization_id,actor_user_id,action,entity_type,entity_id,details) VALUES($1,$2,$3,$4,$5,$6)',
+      [tenderRow.organization_id,req.user!.id,'vendor.bid_submitted','bid',created.rows[0].id,JSON.stringify({ tenderId: parsed.data.tenderId, amount: parsed.data.amount })],
+    );
+    await client.query('COMMIT');
+    return res.status(201).json({ bid: created.rows[0], message: 'Bid submitted successfully.' });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     return next(error);
