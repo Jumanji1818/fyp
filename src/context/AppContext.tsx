@@ -1439,7 +1439,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return { requiresAuthority: true };
     }
 
-    return finalizeAward(tenderId, winBid, vendor, dept, justification);
+    return { requiresAuthority: true };
   };
 
   const finalizeAward = (
