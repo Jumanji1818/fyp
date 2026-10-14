@@ -112,6 +112,15 @@ export const SettingsModule: React.FC = () => {
 
   const handleDownloadBackup = () => {
     const jsonStr = exportDatabaseJson();
+    try {
+      const snapshot = JSON.parse(jsonStr);
+      if (snapshot.bidsRedacted) {
+        window.alert('This JSON snapshot omits bid data that is confidential until tender closing. It cannot be restored while redacted. For a complete point-in-time backup, copy the local procura.db file while Procura is closed.');
+      }
+    } catch {
+      window.alert('The backup snapshot could not be prepared.');
+      return;
+    }
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -139,6 +148,8 @@ export const SettingsModule: React.FC = () => {
       const success = importDatabaseJson(pendingRestoreJson);
       if (success) {
         showSaved();
+      } else {
+        window.alert('Restore was refused. The file may contain redacted open-tender bids or invalid data. Existing records were not changed.');
       }
     }
   };
@@ -537,7 +548,7 @@ export const SettingsModule: React.FC = () => {
                 Database Backup & Disaster Recovery
               </h3>
               <p className="text-[#A8B5AB] mt-0.5">
-                Export full local Drift database schema and all audit logs to a JSON snapshot or restore.
+                Export a JSON snapshot. Confidential open-tender bids are omitted, and audit history is never replaced during JSON restore.
               </p>
             </div>
 
@@ -545,7 +556,7 @@ export const SettingsModule: React.FC = () => {
               <div>
                 <span className="font-semibold text-[#F2EFE6] block">Backup Database Now</span>
                 <span className="text-[11px] text-[#A8B5AB]">
-                  Creates a timestamped snapshot of users, tenders, bids, POs, payments, and audits.
+                  Downloads the current JSON snapshot. Copy procura.db with Procura closed for a complete point-in-time database backup.
                 </span>
               </div>
               <button
