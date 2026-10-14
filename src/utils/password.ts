@@ -44,3 +44,32 @@ export function generateTempPassword(): string {
 
 /** Security answers are compared normalised (case/space-insensitive) and stored hashed. */
 export const normalizeAnswer = (a: string) => a.trim().toLowerCase().replace(/\s+/g, ' ');
+
+
+/** In-memory lockout shared by the sign-in and password-recovery flows. */
+export class LoginLockout {
+  private attempts: Record<string, { count: number; lockedUntil: number }> = {};
+
+  message(key: string, now = Date.now()): string | null {
+    const rec = this.attempts[key];
+    if (rec && rec.lockedUntil > now) {
+      return `Too many failed attempts. Try again in ${Math.ceil((rec.lockedUntil - now) / 60000)} minute(s).`;
+    }
+    if (rec && rec.lockedUntil && rec.lockedUntil <= now) delete this.attempts[key];
+    return null;
+  }
+
+  fail(key: string, now = Date.now()): void {
+    const rec = this.attempts[key] || { count: 0, lockedUntil: 0 };
+    rec.count += 1;
+    if (rec.count >= 5) {
+      rec.lockedUntil = now + 5 * 60 * 1000;
+      rec.count = 0;
+    }
+    this.attempts[key] = rec;
+  }
+
+  clear(key: string): void {
+    delete this.attempts[key];
+  }
+}
