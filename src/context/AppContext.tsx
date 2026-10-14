@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { appStorage } from '../utils/storage';
 import { createPasswordRecord, verifyPassword, validatePassword, generateTempPassword, normalizeAnswer, LoginLockout } from '../utils/password';
-import { BID_EVALUATOR_ROLES, canViewBid, canCommitBudget, approvalRequiresAuthority, canRecordPayment as canRecordPaymentRule, applyAcceptedDelivery, calculateReliabilityScore, calculateWeightedScores, mergeAuditLogAppendOnly } from '../utils/procurementRules';
+import { BID_EVALUATOR_ROLES, canViewBid, canCommitBudget, approvalRequiresAuthority, canRecordPayment as canRecordPaymentRule, applyAcceptedDelivery, calculateReliabilityScore, calculateWeightedScores } from '../utils/procurementRules';
 import {
   Organization,
   OrganizationType,
@@ -443,7 +443,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addAuditLog = useCallback(
     (action: string, recordReference: string, oldValue?: string, newValue?: string, details?: string) => {
       const newEntry: AuditLogEntry = {
-        id: 'aud-' + Date.now(),
+        id: 'aud-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
         organizationId: currentOrganization?.id,
         timestamp: new Date().toISOString(),
         userId: currentUser?.id || 'system',
@@ -1743,6 +1743,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // PO & Delivery Actions
   const acknowledgePO = (poId: string) => {
+    const target = purchaseOrders.find((po) => po.id === poId);
+    if (!target || currentUser?.role !== 'Vendor' || currentUser.vendorId !== target.vendorId || target.status !== 'Issued') return;
     setPurchaseOrders((prev) =>
       prev.map((po) => {
         if (po.id === poId) {
@@ -1763,6 +1765,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const dispatchDelivery = (poId: string, notes: string) => {
+    const target = purchaseOrders.find((po) => po.id === poId);
+    if (!target || currentUser?.role !== 'Vendor' || currentUser.vendorId !== target.vendorId || !['Acknowledged', 'Partially Delivered'].includes(target.status) || !notes.trim()) return;
     setPurchaseOrders((prev) =>
       prev.map((po) => {
         if (po.id === poId) {
@@ -1788,7 +1792,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const receiveDelivery = (poId: string, itemsReceived: DeliveryRecord['itemsReceived']) => {
     const po = purchaseOrders.find((p) => p.id === poId);
-    if (!po) return;
+    const isSoloOwner = currentOrganization.type === 'sole_proprietorship' && currentUser?.organizationId === currentOrganization.id;
+    if (!po || !['Request Officer', 'Organization Admin'].includes(currentUser?.role || '') && !isSoloOwner) return;
+    if (po.organizationId && po.organizationId !== currentOrganization.id || ['Cancelled', 'Closed'].includes(po.status)) return;
+    if (!Array.isArray(itemsReceived) || itemsReceived.length !== po.items.length) return;
+    if (itemsReceived.some((item) => !item || !Number.isFinite(item.received) || item.received < 0 || !['Accepted', 'Partially Accepted', 'Rejected'].includes(item.status))) return;
 
     const todayStr = new Date().toISOString().split('T')[0];
     const expected = new Date(po.expectedDeliveryDate);
@@ -1887,6 +1895,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const recordPayment = (
     paymentData: Omit<PaymentRecord, 'id' | 'voucherNumber' | 'recordedByUserId' | 'recordedByName'>
   ): PaymentRecord | null => {
+    const isSoloOwner = currentOrganization.type === 'sole_proprietorship' && currentUser?.organizationId === currentOrganization.id;
+    if (currentUser?.role !== 'Finance Officer' && !isSoloOwner) return null;
     const voucherNumber = nextRef('PV', payments.map((p) => p.voucherNumber));
     const po = purchaseOrders.find((p) => p.id === paymentData.purchaseOrderId);
     if (!po) return null;
@@ -1980,6 +1990,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     reason?: string,
     targetOrgId?: string
   ) => {
+    if (!['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') || !reason?.trim()) return;
     const orgId = targetOrgId || currentOrganization.id;
     setVendors((prev) =>
       prev.map((v) => {
@@ -2017,7 +2028,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return vendor.organizationStatuses[targetOrg];
     }
     // Default fallback: unless specifically suspended by this target organization, vendor is active & approved
-    return { status: vendor.status === 'Registered' ? 'Registered' : 'Approved' };
+    return { status: vendor.status };
   };
 
   // Budget Adjustments
