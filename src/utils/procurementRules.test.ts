@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createPasswordRecord, verifyPassword, validatePassword, LoginLockout } from './password';
 import {
   approvalRequiresAuthority, applyAcceptedDelivery, canCommitBudget, canRecordPayment,
-  canViewBid, calculateReliabilityScore, calculateWeightedScores,
+  canViewBid, calculateReliabilityScore, calculateWeightedScores, resolveBudgetOverride,
 } from './procurementRules';
 import type { Bid, EvaluationWeights, Tender } from '../types';
 
@@ -30,6 +30,7 @@ describe('procurement controls', () => {
   it('hides bid values from a procurement officer before close and reveals them after close', () => {
     expect(canViewBid(bid, tender, 'Procurement Officer', undefined, Date.parse('2026-10-14T11:59:59Z'))).toBe(false);
     expect(canViewBid(bid, tender, 'Procurement Officer', undefined, Date.parse('2026-10-14T12:00:00Z'))).toBe(true);
+    expect(canViewBid(bid, tender, 'Finance Officer', undefined, Date.parse('2026-10-14T13:00:00Z'))).toBe(false);
     expect(canViewBid(bid, tender, 'Vendor', 'vendor-2', Date.parse('2026-10-14T11:00:00Z'))).toBe(false);
     expect(canViewBid(bid, tender, 'Vendor', 'vendor-1', Date.parse('2026-10-14T11:00:00Z'))).toBe(true);
   });
@@ -41,6 +42,16 @@ describe('procurement controls', () => {
     expect(canCommitBudget(100, 40, 40, 20)).toBe(true);
     expect(canCommitBudget(100, 40, 40, 21)).toBe(false);
     expect(canCommitBudget(100, 40, 40, 21, true)).toBe(true);
+  });
+  it('walks Finance override request through approval and rejection states', () => {
+    const pending = 'Pending' as const;
+    const approved = resolveBudgetOverride(pending, true);
+    expect(approved).toBe('Approved');
+    expect(canCommitBudget(100, 40, 40, 21, approved === 'Approved')).toBe(true);
+    const rejected = resolveBudgetOverride(pending, false);
+    expect(rejected).toBe('Rejected');
+    expect(canCommitBudget(100, 40, 40, 21, rejected === 'Approved')).toBe(false);
+    expect(resolveBudgetOverride('Approved', false)).toBeNull();
   });
   it('counts partial accepted deliveries cumulatively and ignores rejected quantities', () => {
     const result = applyAcceptedDelivery(
