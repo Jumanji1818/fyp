@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { procuraApi, ApiUser } from '../lib/procuraApi';
 import {
   Organization,
   OrganizationType,
@@ -93,7 +94,7 @@ interface AppContextType {
   toggleTheme: () => void;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (c: boolean) => void;
-  login: (email: string, pass: string) => { success: boolean; error?: string; mustChangePassword?: boolean };
+  login: (email: string, pass: string) => Promise<{ success: boolean; error?: string; mustChangePassword?: boolean }>;
   logout: () => void;
   switchUser: (userId: string) => void;
   loadDemoData: () => void;
@@ -208,11 +209,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return list.map((d) => (d.organizationId ? d : { ...d, organizationId: 'org-emerald' }));
   });
 
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'users');
-    const list: User[] = saved ? JSON.parse(saved) : INITIAL_USERS;
-    return list.map((u) => (u.organizationId || u.role === 'Vendor' ? u : { ...u, organizationId: 'org-emerald' }));
-  });
+  // Authentication identities are server-owned. Never initialize or persist user/password records from browser storage.
+  const [users, setUsers] = useState<User[]>([]);
 
   const [categories, setCategories] = useState<Category[]>(() => {
     const saved = localStorage.getItem(STORAGE_PREFIX + 'categories');
@@ -315,9 +313,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     localStorage.setItem(STORAGE_PREFIX + 'departments', JSON.stringify(departments));
   }, [departments]);
-  useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'users', JSON.stringify(users));
-  }, [users]);
   useEffect(() => {
     localStorage.setItem(STORAGE_PREFIX + 'categories', JSON.stringify(categories));
   }, [categories]);
@@ -464,59 +459,52 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Auth, Organization & Staff Provisioning
-  const login = (email: string, pass: string) => {
-    const found = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (found) {
-      // Demo accounts use Procura@2026 until a user changes it; provisioned accounts use their temporary password.
-      const expectedPassword = found.password || found.tempPassword || 'Procura@2026';
-      if (!pass || pass !== expectedPassword) return { success: false, error: 'Incorrect email or password.' };
-      if (found.status === 'Pending') {
-        return { success: false, error: 'Your account is pending administrator approval.' };
-      }
-      if (found.status === 'Deactivated') {
-        return { success: false, error: 'Your account has been deactivated. Contact Admin.' };
-      }
-
-      // If user belongs to an organization, switch active organization to theirs
-      let targetOrg = currentOrganization;
-      if (found.organizationId) {
-        const org = organizations.find((o) => o.id === found.organizationId);
-        if (org) {
-          targetOrg = org;
-          setCurrentOrganization(org);
-          setSettings((prev) => ({
-            ...prev,
-            name: org.name,
-            type:
-              org.type === 'sole_proprietorship'
-                ? 'Sole Proprietor / Small Business'
-                : org.type === 'mega_corporation'
-                ? 'Mega Corporation / Public Parastatal'
-                : 'Enterprise / Corporate',
-            approvalThreshold: org.approvalThreshold,
-            currency: org.currency || '₦',
-            address: org.address,
-            phone: org.phone,
-            email: org.email,
-          }));
+  const login = async (email: string, pass: string) => {
+    try {
+      const response = await procuraApi.login(email.trim(), pass);
+      const apiUser: ApiUser = response.user;
+      const signedInUser: User = {
+        id: apiUser.id,
+        organizationId: apiUser.organizationId || undefined,
+        departmentId: apiUser.departmentId || undefined,
+        vendorId: apiUser.vendorId || undefined,
+        fullName: apiUser.fullName,
+        email: apiUser.email,
+        phone: '',
+        role: apiUser.role as UserRole,
+        status: apiUser.status === 'pending' ? 'Pending' : apiUser.status === 'deactivated' ? 'Deactivated' : 'Active',
+        avatar: apiUser.fullName.substring(0, 2).toUpperCase(),
+        mustChangePassword: apiUser.mustChangePassword,
+        createdAt: new Date().toISOString(),
+      };
+      setCurrentUser(signedInUser);
+      // Never trust a locally selected organization as an authorization boundary.
+      if (apiUser.organizationId) {
+        try {
+          const responseOrg = await procuraApi.currentOrganization();
+          const row = responseOrg.organization;
+          const serverOrg: Organization = {
+            id: String(row.id),
+            name: String(row.name),
+            type: row.type as OrganizationType,
+            industry: String(row.industry || ''),
+            address: String(row.address || ''),
+            phone: String(row.phone || ''),
+            email: String(row.email || ''),
+            approvalThreshold: Number(row.approval_threshold || 0),
+            currency: String(row.currency || 'NGN') === 'NGN' ? '₦' : String(row.currency || '₦'),
+            createdAt: String(row.created_at || new Date().toISOString()),
+          };
+          setCurrentOrganization(serverOrg);
+          setOrganizations((previous) => [serverOrg, ...previous.filter((item) => item.id !== serverOrg.id)]);
+        } catch {
+          // Authentication succeeded; organization details can be refreshed after the API is available.
         }
       }
-
-      setCurrentUser(found);
-      addAuditLog(
-        'User Login',
-        'AUTH',
-        undefined,
-        `Logged in as ${found.role}`,
-        `User ${found.fullName} authenticated successfully in ${targetOrg.name}.`
-      );
-
-      return {
-        success: true,
-        mustChangePassword: !!found.mustChangePassword,
-      };
+      return { success: true, mustChangePassword: apiUser.mustChangePassword };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unable to sign in. Check the API connection.' };
     }
-    return { success: false, error: 'Incorrect email or password.' };
   };
 
   const registerOrganization = (
