@@ -1,202 +1,37 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { ShieldAlert } from 'lucide-react';
 import { Modal } from '../common/Modal';
-import { useApp } from '../../context/AppContext';
-import { Check } from 'lucide-react';
 
 interface ForgotPasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen, onClose }) => {
-  const { users, resetUserPassword } = useApp();
-  const [email, setEmail] = useState('');
-  const [step, setStep] = useState<'verify' | 'new_password' | 'done'>('verify');
-  const [matchedUser, setMatchedUser] = useState<any>(null);
-  const [answer, setAnswer] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
-
-  const handleVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (!user) {
-      setError('No account found with this email address.');
-      return;
-    }
-    if (!user.securityQuestion || !user.securityAnswer) {
-      setError('Password recovery is not configured for this account. Contact your organization administrator.');
-      return;
-    }
-    setMatchedUser(user);
-    setStep('new_password');
-  };
-
-  const handleResetPassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (!matchedUser?.securityAnswer || answer.toLowerCase().trim() !== matchedUser.securityAnswer.toLowerCase().trim()) {
-      setError('Incorrect answer to security question.');
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-
-    const result = resetUserPassword(matchedUser.id, newPassword);
-    if (!result.success) {
-      setError(result.error || 'Unable to reset password.');
-      return;
-    }
-    setStep('done');
-  };
-
-  const handleClose = () => {
-    setStep('verify');
-    setEmail('');
-    setAnswer('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setError('');
-    onClose();
-  };
-
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={handleClose}
-      title="Reset Password"
-      subtitle="Reset using the security question configured for your account"
-      maxWidth="max-w-md"
-    >
-      {step === 'verify' && (
-        <form onSubmit={handleVerify} className="space-y-4 text-xs">
-          {error && (
-            <div className="p-2.5 rounded-lg bg-[#D9534F]/15 border border-[#D9534F]/40 text-[#D9534F]">
-              {error}
-            </div>
-          )}
-          <div>
-            <label className="block text-[#A8B5AB] font-medium mb-1">Registered Account Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. admin@company.ng"
-              className="w-full px-3.5 py-2.5 rounded-[10px] bg-[#132A20] border border-[#1F3A2D] text-[#F2EFE6] outline-none focus:border-[#D4AF37]"
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="px-4 py-2 rounded-[10px] border border-[#1F3A2D] text-[#A8B5AB]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] font-semibold hover:brightness-110"
-            >
-              Verify Security Question
-            </button>
-          </div>
-        </form>
-      )}
-
-      {step === 'new_password' && (
-        <form onSubmit={handleResetPassword} className="space-y-3.5 text-xs">
-          {error && (
-            <div className="p-2.5 rounded-lg bg-[#D9534F]/15 border border-[#D9534F]/40 text-[#D9534F]">
-              {error}
-            </div>
-          )}
-
-          <div className="p-3 rounded-xl bg-[#07130E] border border-[#1F3A2D]">
-            <span className="text-[11px] font-bold text-[#D4AF37] block mb-1">Security Question:</span>
-            <div className="text-[#F2EFE6]">{matchedUser?.securityQuestion || "What is your primary school's name?"}</div>
-          </div>
-
-          <div>
-            <label className="block text-[#A8B5AB] font-medium mb-1">Your Answer</label>
-            <input
-              type="text"
-              required
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              placeholder="Enter answer provided at registration"
-              className="w-full px-3.5 py-2 rounded-[10px] bg-[#132A20] border border-[#1F3A2D] text-[#F2EFE6] outline-none focus:border-[#D4AF37]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[#A8B5AB] font-medium mb-1">New Password</label>
-            <input
-              type="password"
-              required
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-[10px] bg-[#132A20] border border-[#1F3A2D] text-[#F2EFE6] outline-none focus:border-[#D4AF37]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[#A8B5AB] font-medium mb-1">Confirm New Password</label>
-            <input
-              type="password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-[10px] bg-[#132A20] border border-[#1F3A2D] text-[#F2EFE6] outline-none focus:border-[#D4AF37]"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="px-4 py-2 rounded-[10px] border border-[#1F3A2D] text-[#A8B5AB]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] font-semibold hover:brightness-110"
-            >
-              Update Password
-            </button>
-          </div>
-        </form>
-      )}
-
-      {step === 'done' && (
-        <div className="py-6 text-center space-y-4">
-          <div className="w-12 h-12 rounded-full mx-auto bg-[#3FB67A]/20 border border-[#3FB67A] flex items-center justify-center text-[#3FB67A]">
-            <Check className="w-6 h-6 stroke-[3]" />
-          </div>
-          <h4 className="font-bold text-sm text-[#F2EFE6]">Password Reset Successfully</h4>
-          <p className="text-xs text-[#A8B5AB]">
-            Your password has been updated in this demo. You can now sign in using your new credentials.
+export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen, onClose }) => (
+  <Modal
+    isOpen={isOpen}
+    onClose={onClose}
+    title="Password Recovery"
+    subtitle="Secure account recovery"
+    maxWidth="max-w-md"
+  >
+    <div className="space-y-4 text-sm">
+      <div className="flex items-start gap-3 rounded-xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 p-4">
+        <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-[#D4AF37]" />
+        <div>
+          <h3 className="font-semibold text-[#F2EFE6]">Email recovery is not configured yet</h3>
+          <p className="mt-2 text-xs leading-relaxed text-[#A8B5AB]">
+            Procura will not reset an account using security answers stored in this browser. To protect your account, contact your Organization Administrator to request a secure password reset.
           </p>
-          <button
-            onClick={handleClose}
-            className="w-full py-2.5 rounded-[10px] bg-[#1F6F4A] text-white font-semibold text-xs"
-          >
-            Back to Sign In
-          </button>
         </div>
-      )}
-    </Modal>
-  );
-};
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        className="w-full rounded-[10px] bg-[#075B46] px-4 py-2.5 text-sm font-semibold text-white"
+      >
+        Back to Sign In
+      </button>
+    </div>
+  </Modal>
+);
