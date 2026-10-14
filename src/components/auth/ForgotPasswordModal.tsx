@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Modal } from '../common/Modal';
 import { useApp } from '../../context/AppContext';
-import { KeyRound, Check, AlertCircle } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 interface ForgotPasswordModalProps {
   isOpen: boolean;
@@ -43,7 +43,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
       return;
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       setError('Password must be at least 8 characters.');
       return;
     }
@@ -187,7 +187,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
           </div>
           <h4 className="font-bold text-sm text-[#F2EFE6]">Password Reset Successfully</h4>
           <p className="text-xs text-[#A8B5AB]">
-            Your password has been securely updated. You can now sign in using your new credentials.
+            Your password has been updated in this demo. You can now sign in using your new credentials.
           </p>
           <button
             onClick={handleClose}
