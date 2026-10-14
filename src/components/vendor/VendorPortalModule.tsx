@@ -153,7 +153,7 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
     setPrintDoc({
       type: 'Bid Proposal',
       reference: bid.referenceNumber,
-      title: `Sealed Tender Proposal: ${tender?.title || bid.tenderReference}`,
+      title: `Bid Proposal: ${tender?.title || bid.tenderReference}`,
       date: new Date(bid.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
       recipientName: currentVendor.businessName,
       recipientAddress: currentVendor.address,
@@ -167,7 +167,7 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
         totalPrice: i.totalPrice,
       })),
       notes: bid.technicalProposal ? `Technical Methodology & Scope:\n${bid.technicalProposal}` : undefined,
-      terms: `1. Committed delivery milestone: ${bid.proposedDeliveryDate}\n2. Warranty guarantee: ${bid.warrantyPeriod || '12 Months'}\n3. Proposal is sealed and legally binding under procurement stipulations.`,
+      terms: `1. Committed delivery milestone: ${bid.proposedDeliveryDate}\n2. Warranty guarantee: ${bid.warrantyPeriod || '12 Months'}\n3. Proposal remains confidential until the closing time and is legally binding under procurement stipulations.`,
       metaFields: [
         { label: 'Tender Reference', value: bid.tenderReference },
         { label: 'Committed Delivery Date', value: bid.proposedDeliveryDate },
@@ -327,7 +327,7 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
                         <div>
                           {/* Competitor bid shielding: Vendors see count only! (Section 4 & 6.4) */}
                           <span>Bids Submitted:</span>{' '}
-                          <strong className="text-[#D4AF37]">{bidsCount} Bids (Sealed)</strong>
+                          <strong className="text-[#D4AF37]">{bidsCount} Bids Received</strong>
                         </div>
                       </div>
                     </div>
@@ -437,9 +437,9 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
                         <button
                           onClick={() => setViewingSubmittedBid(b)}
                           className="px-2.5 py-1.5 rounded-lg bg-[#132A20] hover:bg-[#1F3A2D] text-[#D4AF37] border border-[#D4AF37]/50 text-xs font-semibold inline-flex items-center gap-1.5 transition-all shadow active:scale-95"
-                          title="View sealed bid details in read-only mode"
+                          title="View your submitted bid details in read-only mode"
                         >
-                          <Eye className="w-3.5 h-3.5" /> View Sealed Bid
+                          <Eye className="w-3.5 h-3.5" /> View Bid
                         </button>
                       </td>
                     </tr>
@@ -638,7 +638,7 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
                 Reference: {submittedBidRef}
               </div>
               <p className="text-xs text-[#A8B5AB] max-w-md mx-auto leading-relaxed">
-                Your proposal has been cryptographically sealed. It will remain confidential and unopened until the tender closing countdown expires.
+                Your proposal is confidential until the closing time. Competing bid amounts and vendor identities remain hidden until the tender closes.
               </p>
               <div className="pt-4">
                 <button
@@ -819,7 +819,7 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
                   disabled={!legalWarningAck || totalBidAmount <= 0}
                   className="px-6 py-2.5 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37] text-[#F2EFE6] font-semibold text-xs flex items-center gap-2 hover:brightness-110 shadow-lg disabled:opacity-40"
                 >
-                  Submit Sealed Bid Proposal <ArrowRight className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  Submit Bid Proposal <ArrowRight className="w-3.5 h-3.5 text-[#D4AF37]" />
                 </button>
               </div>
             </form>
@@ -876,7 +876,7 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
             <div className="p-3 rounded-xl bg-[#3FB67A]/15 border border-[#3FB67A]/30 text-[#3FB67A] flex items-center gap-2">
               <CheckCircle className="w-4 h-4 shrink-0" />
               <span>
-                Proposal sealed and registered in data ledger. Vendors may submit only one bid per tender opportunity.
+                Proposal submitted and recorded. Vendors may submit only one bid per tender opportunity.
               </span>
             </div>
 
@@ -938,7 +938,7 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
                 onClick={() => openPrintBidProposal(viewingSubmittedBid)}
                 className="px-3.5 py-2 rounded-lg bg-[#132A20] hover:bg-[#1F3A2D] text-[#D4AF37] border border-[#D4AF37]/50 text-xs font-semibold flex items-center gap-1.5 transition-all shadow active:scale-95"
               >
-                <Printer className="w-3.5 h-3.5 text-[#D4AF37]" /> Print / Save Sealed Bid
+                <Printer className="w-3.5 h-3.5 text-[#D4AF37]" /> Print / Save PDF
               </button>
               <button
                 type="button"
