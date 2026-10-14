@@ -465,7 +465,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     (notif: Omit<NotificationItem, 'id' | 'read' | 'createdAt'>) => {
       const newItem: NotificationItem = {
         ...notif,
-        id: 'notif-' + Date.now() + Math.random().toString(36).substring(2, 6),
+        organizationId: notif.organizationId || currentOrganization?.id,
+        id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
         read: false,
         createdAt: new Date().toISOString(),
       };
