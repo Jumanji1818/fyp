@@ -70,6 +70,7 @@ interface AppContextType {
     mustChangePassword?: boolean;
   }) => { success: boolean; user?: User; tempPassword: string; error?: string };
   changeTempPassword: (userId: string, currentPass: string, newPass: string) => { success: boolean; error?: string };
+  resetUserPassword: (userId: string, newPass: string) => { success: boolean; error?: string };
   settings: OrganizationSettings;
   updateSettings: (newSettings: Partial<OrganizationSettings>) => void;
   departments: Department[];
@@ -463,9 +464,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Auth, Organization & Staff Provisioning
-  const login = (email: string, _pass: string) => {
+  const login = (email: string, pass: string) => {
     const found = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
     if (found) {
+      // Demo accounts use Procura@2026 until a user changes it; provisioned accounts use their temporary password.
+      const expectedPassword = found.password || found.tempPassword || 'Procura@2026';
+      if (!pass || pass !== expectedPassword) return { success: false, error: 'Incorrect email or password.' };
       if (found.status === 'Pending') {
         return { success: false, error: 'Your account is pending administrator approval.' };
       }
@@ -623,6 +627,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       fullName: adminData.fullName,
       email: adminData.email,
       phone: adminData.phone,
+      password: adminData.password,
       role: 'Organization Admin',
       status: 'Active',
       avatar: adminData.fullName.substring(0, 2).toUpperCase(),
@@ -742,15 +747,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return { success: true, user: newUser, tempPassword: tempPass };
   };
 
-  const changeTempPassword = (userId: string, _currentPass: string, _newPass: string) => {
+  const changeTempPassword = (userId: string, currentPass: string, newPass: string) => {
     const target = users.find((u) => u.id === userId);
     if (!target) return { success: false, error: 'User account not found.' };
+    const expectedPassword = target.password || target.tempPassword || 'Procura@2026';
+    if (!target.mustChangePassword || currentPass !== expectedPassword) return { success: false, error: 'The current temporary password is incorrect.' };
+    if (newPass.length < 8) return { success: false, error: 'Password must be at least 8 characters.' };
+    if (newPass === currentPass) return { success: false, error: 'Choose a password different from your temporary password.' };
 
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id === userId) {
           return {
             ...u,
+            password: newPass,
             mustChangePassword: false,
             tempPassword: undefined,
           };
@@ -761,7 +771,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     if (currentUser?.id === userId) {
       setCurrentUser((prev) =>
-        prev ? { ...prev, mustChangePassword: false, tempPassword: undefined } : null
+        prev ? { ...prev, password: newPass, mustChangePassword: false, tempPassword: undefined } : null
       );
     }
 
@@ -773,6 +783,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       'User successfully changed their temporary password on first login.'
     );
 
+    return { success: true };
+  };
+
+  const resetUserPassword = (userId: string, newPass: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (!target) return { success: false, error: 'User account not found.' };
+    if (newPass.length < 8) return { success: false, error: 'Password must be at least 8 characters.' };
+    setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, password: newPass, tempPassword: undefined, mustChangePassword: false } : u));
+    if (currentUser?.id === userId) setCurrentUser((prev) => prev ? { ...prev, password: newPass, tempPassword: undefined, mustChangePassword: false } : null);
+    addAuditLog('Password Reset', target.email, undefined, 'Password Updated', 'Password reset completed after security-answer verification.');
     return { success: true };
   };
 
@@ -2078,6 +2098,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         registerOrganization,
         provisionStaffUser,
         changeTempPassword,
+    resetUserPassword,
         settings,
         updateSettings,
         departments,
