@@ -12,6 +12,7 @@ describe('report data exports', () => {
       'PO-TEST-01', 'Vendor "A"', 'ICT', '1000', '250', '750', 'Partially Delivered',
     ]);
     expect(outstandingPaymentRows([{ ...po, status: 'Cancelled' } as PurchaseOrder])).toHaveLength(1);
+    expect(outstandingPaymentRows([{ ...po, status: 'Issued' } as PurchaseOrder])).toHaveLength(1);
   });
 
   it('exports remaining budget as allocation minus spent and committed', () => {
