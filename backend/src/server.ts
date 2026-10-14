@@ -351,7 +351,7 @@ app.get('/api/organizations/current', requireAuth, requireOrganization, async (r
 
 const readableRoles: Role[] = ['Organization Admin','Request Officer','Department Head','Procurement Officer','Finance Officer','Approving Authority','Vendor'];
 app.get('/api/records/:recordType', requireAuth, requireOrganization, async (req, res, next) => {
-  const recordType = Array.isArray(req.params.recordType) ? req.params.recordType[0] : req.params.recordType;
+  const recordType = typeof req.params.recordType === 'string' ? req.params.recordType : '';
   if (!['request','tender','bid','purchase_order','delivery','payment','vendor','award','notification'].includes(recordType)) {
     return res.status(400).json({ error: 'Unsupported record type.' });
   }
