@@ -19,6 +19,9 @@ Never commit `.env` or production database credentials. Production deployments m
 - `GET /api/health`
 - `POST /api/admin/bootstrap` — creates the first Platform Admin only when `BOOTSTRAP_ADMIN_KEY` is configured; remove that secret after use.
 - `POST /api/auth/register-organization` — creates an organization and admin account in pending approval state.
+- `POST /api/auth/register-vendor` — creates a vendor profile and vendor login account.
+- `GET /api/vendor/opportunities` — lists currently open tenders from active organizations without exposing competing vendor bids.
+- `POST /api/vendor/bids` — submits a vendor bid to the tender-owning organization, validates the tender is open, and prevents a second bid from the same vendor.
 - `POST /api/admin/organizations/:organizationId/approve` — Platform Admin-only organization approval.
 - `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`
 - `POST /api/auth/change-password`
@@ -30,4 +33,4 @@ Authentication uses an HttpOnly session cookie; session tokens are stored as SHA
 
 ## Scope and limitations of this first increment
 
-This is a backend foundation, not yet a complete application migration. Procurement records currently use a typed record envelope with JSONB payloads while organizations, departments, users, sessions, and audit events have relational tables. Approval state machines, vendor cross-organization visibility, password recovery email delivery, CSRF protection for cross-site deployments, and the frontend's AppContext-to-API integration are subsequent required steps. Do not treat the existing localStorage demo as production-ready until those are completed and tested.
+This is a backend foundation, not yet a complete application migration. Procurement records currently use a typed record envelope with JSONB payloads while organizations, departments, users, sessions, and audit events have relational tables. Full approval and procurement state machines, password recovery email delivery, CSRF protection for cross-site deployments, and the frontend's AppContext-to-API integration are subsequent required steps. Vendor registration and tender/bid API endpoints are present, but still need integration and end-to-end tests. Do not treat the existing localStorage demo as production-ready until those are completed and tested.
