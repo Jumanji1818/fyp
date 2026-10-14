@@ -41,6 +41,7 @@ import { SettingsModule } from './components/settings/SettingsModule';
 const MainApp: React.FC = () => {
   const {
     currentUser,
+    currentOrganization,
     isAuthenticated,
     toggleTheme,
     settings,
@@ -245,11 +246,11 @@ const MainApp: React.FC = () => {
                   />
                 )}
 
-                {currentTab === 'awards' && currentUser?.role === 'Finance Officer' && <BudgetOverrideRequestsModule />}
+                {currentTab === 'awards' && (currentUser?.role === 'Finance Officer' || (currentOrganization.type === 'sole_proprietorship' && currentUser?.role === 'Organization Admin')) && <BudgetOverrideRequestsModule />}
 
                 {currentTab === 'awards' && currentUser?.role === 'Approving Authority' && <AuthorityApprovalsModule />}
 
-                {currentTab === 'awards' && currentUser?.role !== 'Approving Authority' && currentUser?.role !== 'Finance Officer' && (
+                {currentTab === 'awards' && currentUser?.role !== 'Approving Authority' && currentUser?.role !== 'Finance Officer' && !(currentOrganization.type === 'sole_proprietorship' && currentUser?.role === 'Organization Admin') && (
                   <EvaluationModule
                     initialTenderId={navItemId}
                     onNavigateToPO={(poId) => handleNavigate('orders', poId)}
