@@ -1410,8 +1410,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     }
 
-    const requiresAuthority = true;
-
     {
       // Every award recommendation requires Approving Authority sign-off before a PO exists.
       setTenders((prev) =>
