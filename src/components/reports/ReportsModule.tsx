@@ -87,7 +87,7 @@ export const ReportsModule: React.FC = () => {
         { label: 'Organization Entity', value: currentOrganization.name },
         { label: 'Report Category', value: activeReport.replace(/_/g, ' ') },
         { label: 'Fiscal Currency', value: 'Nigerian Naira (NGN ₦)' },
-        { label: 'Records Included', value: activeReport === 'spend_analysis' ? String(orgPayments.length) : activeReport === 'tender_summary' ? String(orgTenders.length) : activeReport === 'delivery_performance' ? String(orgDeliveries.length) : activeReport === 'budget_utilization' ? String(orgDepts.length) : activeReport === 'outstanding_payments' ? String(orgPOs.filter((po) => po.paidAmount < po.totalAmount && po.status !== 'Cancelled').length) : String(orgVendors.length) },
+        { label: 'Records Included', value: activeReport === 'spend_analysis' ? String(orgPayments.length) : activeReport === 'tender_summary' ? String(orgTenders.length) : activeReport === 'delivery_performance' ? String(orgDeliveries.length) : activeReport === 'budget_utilization' ? String(orgDepts.length) : activeReport === 'outstanding_payments' ? String(orgPOs.filter((po) => ['Delivered', 'Partially Delivered'].includes(po.status) && po.paidAmount < po.totalAmount).length) : String(orgVendors.length) },
       ],
     });
   };
@@ -283,7 +283,7 @@ export const ReportsModule: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-[#1F3A2D]">
                   {purchaseOrders
-                    .filter((po) => po.paidAmount < po.totalAmount)
+                    .filter((po) => ['Delivered', 'Partially Delivered'].includes(po.status) && po.paidAmount < po.totalAmount)
                     .map((po) => (
                       <tr key={po.id}>
                         <td className="py-2.5 px-3 font-mono font-bold text-[#E8CF7A]">{po.referenceNumber}</td>
