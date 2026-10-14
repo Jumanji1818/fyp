@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS users (
   email text NOT NULL,
   phone text NOT NULL DEFAULT '',
   password_hash text NOT NULL,
-  role text NOT NULL CHECK (role IN ('Organization Admin','Request Officer','Department Head','Procurement Officer','Finance Officer','Approving Authority','Vendor')),
+  role text NOT NULL CHECK (role IN ('Platform Admin','Organization Admin','Request Officer','Department Head','Procurement Officer','Finance Officer','Approving Authority','Vendor')),
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','pending','deactivated')),
   vendor_id uuid,
   must_change_password boolean NOT NULL DEFAULT false,
