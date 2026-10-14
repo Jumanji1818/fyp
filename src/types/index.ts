@@ -337,6 +337,8 @@ export interface DeliveryRecord {
   isFullyDelivered: boolean;
   onTime: boolean;
   lateDays: number;
+  resolutionStatus?: 'Pending' | 'Resolved';
+  resolutionNotes?: string;
 }
 
 export interface PaymentRecord {
