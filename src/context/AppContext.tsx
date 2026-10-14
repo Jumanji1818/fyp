@@ -664,6 +664,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const switchOrganization = (orgId: string) => {
     const target = organizations.find((o) => o.id === orgId);
     if (!target) return;
+    // Authenticated staff cannot cross organization boundaries by switching UI context.
+    // The login screen can still select an organization before authentication.
+    if (currentUser && currentUser.role !== 'Vendor' && currentUser.organizationId && currentUser.organizationId !== orgId) return;
     setCurrentOrganization(target);
     setSettings((prev) => ({
       ...prev,
@@ -680,17 +683,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       phone: target.phone,
       email: target.email,
     }));
-
-    // If current logged-in user belongs to another organization and is not a global Vendor,
-    // switch to the admin user of the target organization for seamless testing!
-    if (currentUser?.role !== 'Vendor') {
-      const targetAdmin =
-        users.find((u) => u.organizationId === orgId && u.role === 'Organization Admin') ||
-        users.find((u) => u.organizationId === orgId && u.role !== 'Vendor');
-      if (targetAdmin) {
-        setCurrentUser(targetAdmin);
-      }
-    }
 
     addAuditLog(
       'Organization Context Switched',
@@ -1170,19 +1162,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const extendTenderDeadline = (tenderId: string, newDate: string, reason: string) => {
-    setTenders((prev) =>
-      prev.map((t) => {
-        if (t.id === tenderId) {
-          addAuditLog('Extended Tender Deadline', t.referenceNumber, t.bidClosingDateTime, newDate, `Reason: ${reason}`);
-          return {
-            ...t,
-            bidClosingDateTime: newDate,
-            extendedDeadlineReason: reason,
-          };
-        }
-        return t;
-      })
-    );
+    const tender = tenders.find((t) => t.id === tenderId);
+    if (!tender || !currentUser) return;
+    if (!['Procurement Officer', 'Organization Admin'].includes(currentUser.role)) return;
+    if (tender.organizationId && tender.organizationId !== currentOrganization.id) return;
+    const oldDeadline = new Date(tender.bidClosingDateTime).getTime();
+    const proposedDeadline = new Date(newDate).getTime();
+    // A tender can only be extended before its original deadline while it remains open.
+    if (tender.status !== 'Open' || !Number.isFinite(oldDeadline) || oldDeadline <= Date.now()) return;
+    if (!Number.isFinite(proposedDeadline) || proposedDeadline <= oldDeadline || proposedDeadline <= Date.now()) return;
+    if (!reason.trim()) return;
+    setTenders((prev) => prev.map((t) => {
+      if (t.id !== tenderId) return t;
+      addAuditLog('Extended Tender Deadline', t.referenceNumber, t.bidClosingDateTime, newDate, `Reason: ${reason.trim()}`);
+      return { ...t, bidClosingDateTime: newDate, extendedDeadlineReason: reason.trim() };
+    }));
   };
 
   const cancelTender = (tenderId: string, reason: string) => {
@@ -1391,6 +1385,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const tnd = tenders.find((t) => t.id === tenderId);
     const winBid = bids.find((b) => b.id === winningBidId);
     if (!tnd || !winBid) return { requiresAuthority: false, blocked: 'Tender or bid not found.' };
+    // Procurement submits recommendations; Finance may submit a documented budget override.
+    // Only the Approving Authority can finalize an award and generate a purchase order.
+    if (
+      currentUser?.role !== 'Procurement Officer' &&
+      !(currentUser?.role === 'Finance Officer' && !!budgetOverrideReason?.trim())
+    ) return { requiresAuthority: false, blocked: 'Only Procurement can recommend an award; Finance may submit a documented budget override.' };
+    if (tnd.organizationId && tnd.organizationId !== currentOrganization.id) {
+      return { requiresAuthority: false, blocked: 'This tender belongs to another organization.' };
+    }
     if (tnd.status === 'Awarded' || tnd.awaitingAuthorityApproval) {
       return { requiresAuthority: false, blocked: 'This tender has already been awarded or is awaiting authority approval.' };
     }
@@ -1408,11 +1411,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     }
 
-    const threshold = currentOrganization.approvalThreshold || settings.approvalThreshold;
-    const requiresAuthority = winBid.totalAmount > threshold;
+    const requiresAuthority = true;
 
-    if (requiresAuthority) {
-      // High-value: NO purchase order until the Approving Authority signs off
+    {
+      // Every award recommendation requires Approving Authority sign-off before a PO exists.
       setTenders((prev) =>
         prev.map((t) =>
           t.id === tenderId
@@ -1423,13 +1425,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       addNotification({
         forRole: 'Approving Authority',
         title: 'Award Awaiting Your Sign-off',
-        message: `Tender ${tnd.referenceNumber} recommended for ${winBid.vendorName} at \u20a6${winBid.totalAmount.toLocaleString()} exceeds the \u20a6${threshold.toLocaleString()} threshold.`,
+        message: `Tender ${tnd.referenceNumber} has an award recommendation for ${winBid.vendorName} at ${currentOrganization.currency || '₦'}${winBid.totalAmount.toLocaleString()}. Your decision is required before a purchase order can be issued.`,
         type: 'warning',
         recordType: 'tender',
         recordId: tenderId,
       });
       addAuditLog(
-        'High-Value Award Sent for Authority Approval',
+        'Award Recommendation Sent for Authority Approval',
         tnd.referenceNumber,
         'Under Evaluation',
         'Awaiting Approving Authority',
@@ -1648,14 +1650,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Cumulative accepted quantity per PO line (previous deliveries + this one; rejected goods never count)
     const acceptedNow = po.items.map((it, idx) => {
       const rec = itemsReceived[idx];
-      return rec && rec.status === 'Accepted' ? Math.max(0, rec.received) : 0;
+      // Partial acceptance counts toward received quantity; rejected lines never do.
+      return rec && rec.status !== 'Rejected' ? Math.max(0, Math.min(rec.received, it.quantity)) : 0;
     });
     const newReceived = po.items.map((it, idx) => Math.min(it.quantity, (it.receivedQuantity || 0) + acceptedNow[idx]));
     const isFull = po.items.every((it, idx) => newReceived[idx] >= it.quantity);
-    if (acceptedNow.every((n) => n === 0)) return; // nothing accepted - nothing to record
+    const hasAcceptedItems = acceptedNow.some((n) => n > 0);
+    const hasRejectedItems = itemsReceived.some((item) => item.status === 'Rejected');
 
+    // Record every inspection, including fully rejected consignments, for a resolution trail.
     const newDelivery: DeliveryRecord = {
       id: 'del-' + Date.now(),
+      organizationId: currentOrganization.id,
       purchaseOrderId: poId,
       poReference: po.referenceNumber,
       vendorId: po.vendorId,
@@ -1679,7 +1685,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (p.id === poId) {
           return {
             ...p,
-            status: isFull ? 'Delivered' : 'Partially Delivered',
+            status: isFull ? 'Delivered' : hasAcceptedItems ? 'Partially Delivered' : p.status,
             actualDeliveryDate: todayStr,
             deliveredOnTime: isOnTime,
             lateDays,
@@ -1713,21 +1719,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
 
     addAuditLog(
-      'Store Received Consignment',
+      'Store Receiving Inspection Recorded',
       po.referenceNumber,
       po.status,
-      isFull ? 'Delivered' : 'Partially Delivered',
-      `On-Time: ${isOnTime ? 'Yes' : `Late by ${lateDays} days`}`
+      isFull ? 'Delivered' : hasAcceptedItems ? 'Partially Delivered' : 'Rejected / Resolution Required',
+      `Accepted quantities recorded. Rejected lines: ${itemsReceived.filter((item) => item.status === 'Rejected').length}. On-time: ${isOnTime ? 'Yes' : `Late by ${lateDays} days`}`
     );
 
-    addNotification({
-      forRole: 'Finance Officer',
-      title: 'Delivery Received - Payment Due',
-      message: `Items for ${po.referenceNumber} have been received and verified. Payment is now due.`,
-      type: 'info',
-      recordType: 'po',
-      recordId: po.id,
-    });
+    if (hasRejectedItems) {
+      addNotification({
+        forRole: 'Procurement Officer',
+        title: 'Rejected Delivery Requires Resolution',
+        message: `Inspection for ${po.referenceNumber} includes rejected line items. Arrange replacement, return, or a documented resolution before closure.`,
+        type: 'warning',
+        recordType: 'po',
+        recordId: po.id,
+      });
+    }
+
+    if (hasAcceptedItems) {
+      addNotification({
+        forRole: 'Finance Officer',
+        title: 'Delivery Received - Payment Review',
+        message: `Accepted goods for ${po.referenceNumber} were recorded. Review payment only against accepted quantities and the outstanding PO balance.`,
+        type: 'info',
+        recordType: 'po',
+        recordId: po.id,
+      });
+    }
   };
 
   // Payments
@@ -1871,8 +1890,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Budget Adjustments
   const adjustBudget = (deptId: string, newBudget: number, reason: string) => {
+    if (currentUser?.role !== 'Finance Officer') return;
     const dept = departments.find((d) => d.id === deptId);
-    if (!dept) return;
+    if (!dept || (dept.organizationId && dept.organizationId !== currentOrganization.id)) return;
+    if (!Number.isFinite(newBudget) || newBudget < 0 || !reason.trim()) return;
 
     const oldBudget = dept.annualBudget;
     const newChange: BudgetChange = {
