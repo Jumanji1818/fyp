@@ -73,7 +73,19 @@ app.whenReady().then(async () => {
   const final = await run(`(()=>{const t=window.__app.tenders.find(x=>x.id==='tnd-4');return {status:t.status,awaiting:t.awaitingAuthorityApproval,poCount:window.__app.purchaseOrders.filter(po=>po.tenderId==='tnd-4').length}})()`);
   assert.equal(final.status, 'Awarded');
   assert.equal(final.awaiting, false);
+
+  // Cancellation after issuance must release the unpaid commitment and leave an audit trail.
+  await call(`a.switchUser('user-proc')`);
+  const beforeCancel = await run(`(()=>{const a=window.__app;const po=a.purchaseOrders.find(x=>x.tenderId==='tnd-4');const d=a.departments.find(x=>x.id===po.departmentId);return {poId:po.id,status:po.status,total:po.totalAmount,paid:po.paidAmount,committed:d.committed}})()`);
+  assert.equal(beforeCancel.status, 'Issued', 'PO should be issued before cancellation test');
+  await call(`a.cancelTender('tnd-4','Automated cancellation test')`, 500);
+  const afterCancel = await run(`(()=>{const a=window.__app;const po=a.purchaseOrders.find(x=>x.id===${JSON.stringify(beforeCancel.poId)});const t=a.tenders.find(x=>x.id==='tnd-4');const d=a.departments.find(x=>x.id===po.departmentId);return {poStatus:po.status,tenderStatus:t.status,committed:d.committed,bids:a.bids.filter(b=>b.tenderId==='tnd-4').map(b=>b.status),audit:a.auditLogs.some(x=>x.action==='Cancelled Tender'&&x.recordReference==='TND-2026-0004')}})()`);
+  assert.equal(afterCancel.poStatus, 'Cancelled');
+  assert.equal(afterCancel.tenderStatus, 'Cancelled');
+  assert.equal(afterCancel.committed, Math.max(0, beforeCancel.committed - Math.max(0, beforeCancel.total - beforeCancel.paid)));
+  assert.ok(afterCancel.bids.length > 0 && afterCancel.bids.every(status => status === 'Withdrawn'), 'all bids must be withdrawn');
+  assert.equal(afterCancel.audit, true, 'tender cancellation must be audited');
   assert.deepEqual(errors, [], 'renderer must not log errors');
-  console.log('BUDGET OVERRIDE E2E PASSED', JSON.stringify({ rejectedRequest, approvedRequest, final }));
+  console.log('BUDGET OVERRIDE / AUTHORITY / CANCELLATION E2E PASSED', JSON.stringify({ rejectedRequest, approvedRequest, final, afterCancel }));
   app.quit();
 }).catch((error) => { console.error('BUDGET OVERRIDE E2E FAILED', error); process.exitCode = 1; app.quit(); });
