@@ -472,7 +472,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       };
       setNotifications((prev) => [newItem, ...prev]);
     },
-    []
+    [currentOrganization?.id]
   );
 
   const markNotificationRead = (id: string) => {
