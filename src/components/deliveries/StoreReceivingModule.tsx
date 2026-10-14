@@ -22,6 +22,10 @@ export const StoreReceivingModule: React.FC = () => {
     po.organizationId ? po.organizationId === currentOrganization.id : currentOrganization.id === 'org-emerald'
   );
 
+  const orgDeliveries = deliveries.filter((delivery) =>
+    delivery.organizationId ? delivery.organizationId === currentOrganization.id : currentOrganization.id === 'org-emerald'
+  );
+
   const [activePO, setActivePO] = useState<PurchaseOrder | null>(null);
   const [itemsReceived, setItemsReceived] = useState<
     Array<{
@@ -88,11 +92,11 @@ export const StoreReceivingModule: React.FC = () => {
       </div>
 
       {/* Rejected consignments remain visible until a replacement/return inspection resolves them. */}
-      {deliveries.some((del) => del.itemsReceived.some((item) => item.status === 'Rejected') && del.resolutionStatus !== 'Resolved') && (
+      {orgDeliveries.some((del) => del.itemsReceived.some((item) => item.status === 'Rejected') && del.resolutionStatus !== 'Resolved') && (
         <div className="bg-[#D9534F]/10 rounded-2xl border border-[#D9534F]/40 p-5">
           <h3 className="text-sm font-bold text-[#F2EFE6] mb-3 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-[#D9534F]" /> Rejected Deliveries Requiring Resolution</h3>
           <div className="space-y-3">
-            {deliveries.filter((del) => del.itemsReceived.some((item) => item.status === 'Rejected') && del.resolutionStatus !== 'Resolved').map((del) => {
+            {orgDeliveries.filter((del) => del.itemsReceived.some((item) => item.status === 'Rejected') && del.resolutionStatus !== 'Resolved').map((del) => {
               const po = orgPOs.find((item) => item.id === del.purchaseOrderId);
               return <div key={del.id} className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-xl bg-[#07130E] border border-[#D9534F]/30 p-3">
                 <div>
@@ -165,7 +169,7 @@ export const StoreReceivingModule: React.FC = () => {
       {/* Historical Deliveries Log */}
       <div className="bg-[#0D1F17] rounded-2xl border border-[#1F3A2D] p-5 shadow-xl">
         <h3 className="text-sm font-bold font-serif-heading text-[#F2EFE6] mb-3">
-          Completed Delivery Inspection Records
+          Delivery Inspection History
         </h3>
 
         <div className="overflow-x-auto text-xs">
@@ -181,7 +185,7 @@ export const StoreReceivingModule: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1F3A2D]">
-              {deliveries.map((del) => (
+              {orgDeliveries.map((del) => (
                 <tr key={del.id}>
                   <td className="py-2.5 px-3 font-mono font-bold text-[#E8CF7A]">{del.poReference}</td>
                   <td className="py-2.5 px-3 font-semibold text-[#F2EFE6]">{del.vendorName}</td>
