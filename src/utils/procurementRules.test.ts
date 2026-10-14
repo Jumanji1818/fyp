@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createPasswordRecord, verifyPassword, validatePassword, LoginLockout } from './password';
 import {
-  approvalRequiresAuthority, applyAcceptedDelivery, canCommitBudget, canRecordPayment,
+  approvalRequiresAuthority, applyAcceptedDelivery, canCommitBudget, canRecordPayment, canVendorBid, remainingCommitmentAfterCancellation, isSoloOwnerFlow,
   canViewBid, calculateReliabilityScore, calculateWeightedScores, resolveBudgetOverride,
 } from './procurementRules';
 import type { Bid, EvaluationWeights, Tender } from '../types';
@@ -80,6 +80,21 @@ describe('procurement controls', () => {
   it('updates reliability for late and rejected deliveries', () => {
     expect(calculateReliabilityScore(1, 1, 1)).toBe(53);
     expect(calculateReliabilityScore(0, 0, 0)).toBe(60);
+  });
+  it('allows bidding only after procurement approval and blocks suspended vendors', () => {
+    expect(canVendorBid('Registered')).toBe(false);
+    expect(canVendorBid('Suspended')).toBe(false);
+    expect(canVendorBid('Blacklisted')).toBe(false);
+    expect(canVendorBid('Approved')).toBe(true);
+  });
+  it('releases only the unpaid commitment on cancellation', () => {
+    expect(remainingCommitmentAfterCancellation(1000, 250)).toBe(750);
+    expect(remainingCommitmentAfterCancellation(1000, 1200)).toBe(0);
+  });
+  it('supports the single-user sole-proprietor flow without granting it to another organization', () => {
+    expect(isSoloOwnerFlow('sole_proprietorship', 'org-husab', 'org-husab')).toBe(true);
+    expect(isSoloOwnerFlow('enterprise', 'org-emerald', 'org-emerald')).toBe(false);
+    expect(isSoloOwnerFlow('sole_proprietorship', 'org-husab', 'org-emerald')).toBe(false);
   });
   it('locks after five failed attempts and unlocks after five minutes', () => {
     const lockout = new LoginLockout();
