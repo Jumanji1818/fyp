@@ -859,9 +859,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return { success: false, error: 'An account with this login email already exists.' };
     }
     const { securityAnswer, ...userRest } = user;
-    const newUser: User = { ...userRest, ...(securityAnswer ? answerRecord(securityAnswer) : {}), ...createPasswordRecord(password) };
-    setVendors((prev) => [vendor, ...prev]);
+    const userId = user.id || 'user-' + Date.now();
+    const newUser: User = {
+      ...userRest,
+      id: userId,
+      role: 'Vendor',
+      status: 'Active',
+      organizationId: undefined,
+      vendorId: vendor.id,
+      ...(securityAnswer ? answerRecord(securityAnswer) : {}),
+      ...createPasswordRecord(password),
+    };
+    const newVendor: VendorProfile = {
+      ...vendor,
+      userId,
+      status: 'Registered',
+      inMyVendors: false,
+      organizationStatuses: {},
+    };
+    setVendors((prev) => [newVendor, ...prev]);
     setUsers((prev) => [newUser, ...prev]);
+    addAuditLog('Vendor Registered', newVendor.businessName, undefined, 'Registered', 'Vendor account created; Procurement approval is required before bidding.');
+    addNotification({
+      forRole: 'Procurement Officer',
+      title: 'New Vendor Registration',
+      message: `${newVendor.businessName} registered and is waiting for Procurement approval.`,
+      type: 'info',
+    });
     setCurrentUser(newUser);
     return { success: true };
   };
@@ -1644,7 +1668,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const tnd = tenders.find((t) => t.id === tenderId);
     const winBidId = tnd?.pendingAuthorityBidId || bids.find((b) => b.tenderId === tenderId)?.id;
     const winBid = bids.find((b) => b.id === winBidId);
-    if (!tnd || !winBid) return;
+    if (!tnd || !winBid || (tnd.organizationId && tnd.organizationId !== currentOrganization.id)) return;
     if (currentUser?.role !== 'Approving Authority') return;
     if (!tnd.awaitingAuthorityApproval) return;
 
@@ -1904,7 +1928,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const recordPayment = (
     paymentData: Omit<PaymentRecord, 'id' | 'voucherNumber' | 'recordedByUserId' | 'recordedByName'>
   ): PaymentRecord | null => {
-    const isSoloOwner = currentOrganization.type === 'sole_proprietorship' && currentUser?.organizationId === currentOrganization.id;
+    const isSoloOwner = isSoloOwnerFlow(currentOrganization.type, currentUser?.organizationId, currentOrganization.id);
     if (currentUser?.role !== 'Finance Officer' && !isSoloOwner) return null;
     const voucherNumber = nextRef('PV', payments.map((p) => p.voucherNumber));
     const po = purchaseOrders.find((p) => p.id === paymentData.purchaseOrderId);
@@ -2019,12 +2043,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             updatedAt: new Date().toISOString(),
           };
           addAuditLog(
-            'Vendor Status Changed',
+            status === 'Approved' ? 'Vendor Approved by Procurement' : status === 'Suspended' ? 'Vendor Suspended' : status === 'Blacklisted' ? 'Vendor Blacklisted' : 'Vendor Status Changed',
             `${v.businessName} (${currentOrganization.name})`,
             previousStatus,
             status,
             reason
           );
+          addNotification({
+            userId: v.userId,
+            forRole: 'Vendor',
+            title: status === 'Approved' ? 'Vendor Account Approved' : status === 'Suspended' ? 'Vendor Account Suspended' : status === 'Blacklisted' ? 'Vendor Account Blacklisted' : 'Vendor Status Updated',
+            message: status === 'Approved'
+              ? `${currentOrganization.name} approved your vendor account. You may now bid on eligible tenders.`
+              : `${currentOrganization.name} changed your vendor status to ${status}. Reason: ${reason}`,
+            type: status === 'Approved' ? 'success' : status === 'Suspended' || status === 'Blacklisted' ? 'danger' : 'info',
+          });
           return {
             ...v,
             organizationStatuses: orgStatuses,
