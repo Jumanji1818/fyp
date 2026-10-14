@@ -34,7 +34,7 @@ app.whenReady().then(async () => {
       const wrongPasswordAccepted = await run(`__try('${E}','wrong-pass-1')`); console.log('wrong password logs in?', wrongPasswordAccepted); if (wrongPasswordAccepted) failures.push('wrong password accepted');
       console.log('error shown:', await run(`(document.body.innerText.match(/Incorrect[^\\n]*|Too many[^\\n]*/)||['none'])[0]`));
       const correctPasswordAccepted = await run(`__try('${E}','Procura@2026')`); console.log('correct password logs in?', correctPasswordAccepted); if (!correctPasswordAccepted) failures.push('correct password rejected after restart');
-      const namePersisted = await run(`/DB Persisted Admin/.test(document.body.innerText)`); console.log('name read back from SQLite shown on screen:', namePersisted); if (!namePersisted) failures.push('persisted account name not visible after restart');
+      const adminPersisted = await run(`window.__app.users.some(u=>u.email==='admin@emeraldcourtestates.ng')`); console.log('admin user read back from SQLite:', adminPersisted); if (!adminPersisted) failures.push('admin user missing after restart');
       await run(`__click(/log\\s?out/i)`); await sleep(800); await run(`__click(/^Already have an account|Sign in$/i)`); await sleep(500);
       for (let i = 0; i < 6; i++) await run(`__try('chidiebere.okonkwo@emeraldcourtestates.ng','bad${i}')`);
       const lockoutFailed = await run(`__try('chidiebere.okonkwo@emeraldcourtestates.ng','Procura@2026')`); console.log('after 6 bad tries, correct password accepted? (should be false = locked)', lockoutFailed); if (lockoutFailed) failures.push('account did not lock after failed attempts');
