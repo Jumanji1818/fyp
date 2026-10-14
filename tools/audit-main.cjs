@@ -4,6 +4,7 @@ const path = require('path'); const fs = require('fs'); const { pathToFileURL } 
 require('./dbstub.cjs');
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 const DIST = path.join(__dirname, '..', 'dist');
+fs.mkdirSync('/tmp/shots', { recursive: true });
 const USERS = (process.env.AUDIT_USERS || 'admin@emeraldcourtestates.ng,blessing.adeyemi@emeraldcourtestates.ng,fatima.mohammed@emeraldcourtestates.ng,chidiebere.okonkwo@emeraldcourtestates.ng,folake.oshodi@emeraldcourtestates.ng,babatunde.adeleke@emeraldcourtestates.ng,musa@apexholdings.ng,hussain@husabdesign.ng').split(',');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 app.whenReady().then(async () => {
@@ -28,16 +29,16 @@ app.whenReady().then(async () => {
     entry.loggedIn = await run(`/Log Out/.test(document.body.innerText)`);
     if (!entry.loggedIn) { entry.note = 'login failed (filled=' + filled + ')'; report.push(entry); continue; }
     entry.who = await run(`(document.body.innerText.match(/(Organization Admin|Request Officer|Department Head|Procurement Officer|Finance Officer|Approving Authority|Vendor)/)||[''])[0] + ' | ' + (document.body.innerText.match(/Good (morning|afternoon|evening),[^\\n]*/)||[''])[0]`);
-    const openMenu = async () => { await run(`__click(/^\\s*Menu\\s*$/i)`); await sleep(400); };
+    const openMenu = async () => { await run(`__click(/^\\s*Menu\\s*$/i)`); await sleep(150); };
     await openMenu();
     const labels = await run(`[...document.querySelectorAll('aside nav button')].map(b=>(b.innerText||'').trim()).filter(Boolean)`);
-    await run(`document.querySelector('aside button[title*="Close"]')?.click(); true`); await sleep(300);
+    await run(`document.querySelector('aside button[title*="Close"]')?.click(); true`); await sleep(100);
     entry.nav = labels;
     for (const label of labels) {
       const before = consoleErrs.length;
       await openMenu();
       await run(`(()=>{const b=[...document.querySelectorAll('aside nav button')].find(x=>(x.innerText||'').trim()===${JSON.stringify(label)});b&&b.click();return true})()`);
-      await sleep(900);
+      await sleep(350);
       const info = await run(`(()=>{const t=(document.querySelector('main')||document.body).innerText;const m=t.match(/.{0,40}(\\bundefined\\b|\\bNaN\\b|\\[object|\\bnull\\b|Invalid Date|something went wrong).{0,40}/);return {len:t.length,err:m?m[0].replace(/\\n/g,' '):''}})()`);
       const img = await win.webContents.capturePage();
       const f = `/tmp/shots/${email.split('@')[0]}__${label.replace(/[^a-z0-9]+/gi, '_')}.png`; fs.writeFileSync(f, img.toPNG());
@@ -46,5 +47,9 @@ app.whenReady().then(async () => {
     report.push(entry);
   }
   fs.writeFileSync('/tmp/audit.json', JSON.stringify({ report, consoleErrs }, null, 2));
-  console.log('AUDIT DONE'); app.quit();
+  const failures = report.filter((entry) => !entry.loggedIn || !entry.nav?.length || entry.tabs.some((tab) => tab.suspiciousText || tab.newConsoleErrors.length));
+  console.log('AUDIT SUMMARY', JSON.stringify({ users: report.length, loggedIn: report.filter((entry) => entry.loggedIn).length, screens: report.reduce((n, entry) => n + entry.tabs.length, 0), consoleErrors: consoleErrs.length, failures: failures.map((entry) => ({ email: entry.email, note: entry.note, suspicious: entry.tabs.filter((tab) => tab.suspiciousText).map((tab) => tab.label) })) }));
+  if (failures.length || consoleErrs.length) { console.error('AUDIT FAILED'); process.exitCode = 1; }
+  else console.log('AUDIT DONE');
+  app.quit();
 });

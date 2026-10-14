@@ -97,6 +97,9 @@ app.whenReady().then(async () => {
   const usersJson = JSON.parse(rows['procura_app_v1_users'] || '[]');
   check('SQLite holds the new users', ['test.officer@emeraldcourtestates.ng','new.hire@emeraldcourtestates.ng','ada@testsupplies.ng','boss@acme.ng'].every((e) => usersJson.some((u) => u.email === e)));
   check('SQLite contains no plaintext passwords', !/Better#Pass9|Hire#Pass123|Vendor#Pass77|Strong#Pass1|Fresh#Pass1/.test(JSON.stringify(rows)));
-  console.log('\nTOTAL', results.filter(Boolean).length + '/' + results.length, 'passed; console errors:', JSON.stringify(errs.slice(0, 3)));
+  const passed = results.filter(Boolean).length;
+  console.log('\nTOTAL', passed + '/' + results.length, 'passed; console errors:', JSON.stringify(errs.slice(0, 3)));
+  if (passed !== results.length || errs.length) { console.error('AUTH E2E FAILED'); process.exitCode = 1; }
+  else console.log('AUTH E2E PASSED');
   db.close(); app.quit();
 });
