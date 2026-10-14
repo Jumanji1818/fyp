@@ -8,15 +8,18 @@ This API is the first step in replacing browser-only state with a shared, persis
 2. Create a dedicated PostgreSQL database and application user.
 3. Copy `.env.example` to `.env` and set `DATABASE_URL`, `FRONTEND_ORIGIN`, and `COOKIE_SECURE`.
 4. From this directory run `npm install`.
-5. Apply the initial schema using `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/001_initial_schema.sql`.
-6. Run `npm run dev`; health check is `GET http://localhost:4000/api/health`.
+5. For the first platform administrator only, configure a high-entropy `BOOTSTRAP_ADMIN_KEY`, call `POST /api/admin/bootstrap`, then remove the key from the deployment environment.
+6. Apply the initial schema using `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/001_initial_schema.sql`.
+7. Run `npm run dev`; health check is `GET http://localhost:4000/api/health`.
 
 Never commit `.env` or production database credentials. Production deployments must use HTTPS and set `COOKIE_SECURE=true`.
 
 ## Initial endpoints
 
 - `GET /api/health`
+- `POST /api/admin/bootstrap` — creates the first Platform Admin only when `BOOTSTRAP_ADMIN_KEY` is configured; remove that secret after use.
 - `POST /api/auth/register-organization` — creates an organization and admin account in pending approval state.
+- `POST /api/admin/organizations/:organizationId/approve` — Platform Admin-only organization approval.
 - `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`
 - `POST /api/auth/change-password`
 - `POST /api/auth/staff` — organization-admin-only staff provisioning.
