@@ -1400,7 +1400,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (winBid.tenderId !== tenderId) return { requiresAuthority: false, blocked: 'That bid does not belong to this tender.' };
     if (winBid.compliancePassed === false) return { requiresAuthority: false, blocked: 'This bid failed the compliance check and cannot be awarded.' };
 
-    const vendor = vendors.find((v) => v.id === winBid.vendorId);
     const dept = departments.find((d) => d.id === tnd.departmentId);
 
     // Budget enforcement (only a Finance override reason lets an over-budget award through)
