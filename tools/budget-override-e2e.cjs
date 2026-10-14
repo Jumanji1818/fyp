@@ -85,7 +85,21 @@ app.whenReady().then(async () => {
   assert.equal(afterCancel.committed, Math.max(0, beforeCancel.committed - Math.max(0, beforeCancel.total - beforeCancel.paid)));
   assert.ok(afterCancel.bids.length > 0 && afterCancel.bids.every(status => status === 'Withdrawn'), 'all bids must be withdrawn');
   assert.equal(afterCancel.audit, true, 'tender cancellation must be audited');
+
+  // Sole-proprietor path: self-approve a requisition and publish it without forcing corporate departments into the flow.
+  await call(`a.switchUser('user-husab-admin')`);
+  await call(`a.switchOrganization('org-husab')`);
+  const soleRequest = await call(`a.createRequest({title:'E2E Sole Proprietor Fabric Purchase',justification:'Automated sole proprietor workflow check',items:[{id:'solo-item-1',description:'Premium fabric sample',category:'Fashion, Textiles & Haberdashery',subcategory:'Premium Cashmere & Wool',quantity:2,unit:'Meters',unitPrice:100,totalPrice:200}]})`);
+  assert.equal(soleRequest.organizationId, 'org-husab');
+  assert.equal(soleRequest.status, 'Approved by Department', 'sole proprietor request should be self-approved');
+  assert.equal(soleRequest.reviewerId, 'user-husab-admin');
+  assert.match(soleRequest.reviewComment || '', /Sole Proprietor/i);
+  const soleTender = await call(`a.createTenderFromRequest(${JSON.stringify(soleRequest.id)},{title:'E2E Sole Proprietor Fabric Tender',categories:['Fashion, Textiles & Haberdashery'],bidClosingDateTime:new Date(Date.now()+7*86400000).toISOString()})`, 400);
+  assert.equal(soleTender.organizationId, 'org-husab');
+  assert.equal(soleTender.status, 'Open');
+  const convertedRequest = await run(`window.__app.requests.find(r=>r.id===${JSON.stringify(soleRequest.id)})?.status`);
+  assert.equal(convertedRequest, 'Converted to Tender', 'published tender must convert the sole proprietor request');
   assert.deepEqual(errors, [], 'renderer must not log errors');
-  console.log('BUDGET OVERRIDE / AUTHORITY / CANCELLATION E2E PASSED', JSON.stringify({ rejectedRequest, approvedRequest, final, afterCancel }));
+  console.log('BUDGET OVERRIDE / AUTHORITY / CANCELLATION / SOLE PROPRIETOR E2E PASSED', JSON.stringify({ rejectedRequest, approvedRequest, final, afterCancel, soleRequest: soleRequest.referenceNumber, soleTender: soleTender.referenceNumber }));
   app.quit();
 }).catch((error) => { console.error('BUDGET OVERRIDE E2E FAILED', error); process.exitCode = 1; app.quit(); });
