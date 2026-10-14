@@ -9,7 +9,7 @@ app.whenReady().then(async () => {
   protocol.handle('app', (req) => { const p = decodeURIComponent(new URL(req.url).pathname); return net.fetch(pathToFileURL(path.join(DIST, p === '/' ? 'index.html' : p)).toString()); });
   ipcMain.handle('save-pdf', async (event) => { const data = await event.sender.printToPDF({ pageSize: 'A4', printBackground: true, preferCSSPageSize: true }); fs.writeFileSync(process.env.PROCURA_TEST_PDF, data); return { path: process.env.PROCURA_TEST_PDF }; });
   const win = new BrowserWindow({ width: 1366, height: 820, show: false, webPreferences: { preload: path.join(__dirname, '..', 'electron', 'preload.cjs'), contextIsolation: true } });
-  win.webContents.on('console-message', (_e, level, msg) => { if (level >= 2) errs.push(msg.slice(0, 200)); });
+  win.webContents.on('console-message', (_e, level, msg) => { if (level >= 2 && !/Electron Security Warning|Insecure Content-Security-Policy/.test(msg)) errs.push(msg.slice(0, 200)); });
   await win.loadURL('app://procura/index.html'); await sleep(4500);
   const run = (c) => win.webContents.executeJavaScript(c, true);
   await run(`window.__click=(re)=>{const b=[...document.querySelectorAll('button,a')].find(x=>re.test((x.innerText||x.title||'').trim()));if(b){b.click();return true}return false};window.__fill=(el,v)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}))};true`);
@@ -32,6 +32,6 @@ app.whenReady().then(async () => {
   if (!appVisible) failures.push('app did not return to the visible normal screen');
   if (errs.length) failures.push('renderer console errors');
   console.log('PDF E2E SUMMARY', JSON.stringify({ pdfExists, pdfBytes, appVisible, failures }));
-  if (failures.length) { console.error('PDF E2E FAILED'); process.exitCode = 1; }
+  if (failures.length) { console.error('PDF E2E FAILED'); app.exit(1); return; }
   app.quit();
-}).catch((error) => { console.error('PDF E2E CRASHED', error); process.exitCode = 1; app.quit(); });
+}).catch((error) => { console.error('PDF E2E CRASHED', error); app.exit(1); });

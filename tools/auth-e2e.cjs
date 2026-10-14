@@ -99,7 +99,7 @@ app.whenReady().then(async () => {
   check('SQLite contains no plaintext passwords', !/Better#Pass9|Hire#Pass123|Vendor#Pass77|Strong#Pass1|Fresh#Pass1/.test(JSON.stringify(rows)));
   const passed = results.filter(Boolean).length;
   console.log('\nTOTAL', passed + '/' + results.length, 'passed; console errors:', JSON.stringify(errs.slice(0, 3)));
-  if (passed !== results.length || errs.length) { console.error('AUTH E2E FAILED'); process.exitCode = 1; }
-  else console.log('AUTH E2E PASSED');
+  if (passed !== results.length || errs.length) { console.error('AUTH E2E FAILED'); db.close(); app.exit(1); return; }
+  console.log('AUTH E2E PASSED');
   db.close(); app.quit();
-}).catch((error) => { console.error('AUTH E2E CRASHED', error); process.exitCode = 1; app.quit(); });
+}).catch((error) => { console.error('AUTH E2E CRASHED', error); app.exit(1); });

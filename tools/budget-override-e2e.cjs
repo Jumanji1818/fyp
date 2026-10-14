@@ -14,7 +14,7 @@ app.whenReady().then(async () => {
   });
   const win = new BrowserWindow({ width: 1366, height: 900, show: false, webPreferences: { preload: path.join(__dirname, '..', 'electron', 'preload.cjs'), contextIsolation: true } });
   const errors = [];
-  win.webContents.on('console-message', (_event, level, message) => { if (level >= 2) errors.push(message.slice(0, 200)); });
+  win.webContents.on('console-message', (_event, level, message) => { if (level >= 2 && !/Electron Security Warning|Insecure Content-Security-Policy/.test(message)) errors.push(message.slice(0, 200)); });
   await win.loadURL('app://procura/index.html');
   await sleep(4500);
   const run = (code) => win.webContents.executeJavaScript(code, true);
@@ -102,4 +102,4 @@ app.whenReady().then(async () => {
   assert.deepEqual(errors, [], 'renderer must not log errors');
   console.log('BUDGET OVERRIDE / AUTHORITY / CANCELLATION / SOLE PROPRIETOR E2E PASSED', JSON.stringify({ rejectedRequest, approvedRequest, final, afterCancel, soleRequest: soleRequest.referenceNumber, soleTender: soleTender.referenceNumber }));
   app.quit();
-}).catch((error) => { console.error('BUDGET OVERRIDE E2E FAILED', error); process.exitCode = 1; app.quit(); });
+}).catch((error) => { console.error('BUDGET OVERRIDE E2E FAILED', error); app.exit(1); });

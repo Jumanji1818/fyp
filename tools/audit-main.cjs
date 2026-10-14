@@ -54,7 +54,7 @@ app.whenReady().then(async () => {
   fs.writeFileSync('/tmp/audit.json', JSON.stringify({ report, consoleErrs }, null, 2));
   const failures = report.filter((entry) => !entry.loggedIn || !entry.nav?.length || entry.tabs.some((tab) => tab.suspiciousText || tab.newConsoleErrors.length));
   console.log('AUDIT SUMMARY', JSON.stringify({ users: report.length, loggedIn: report.filter((entry) => entry.loggedIn).length, screens: report.reduce((n, entry) => n + entry.tabs.length, 0), consoleErrors: consoleErrs.length, externalRequests, failures: failures.map((entry) => ({ email: entry.email, note: entry.note, suspicious: entry.tabs.filter((tab) => tab.suspiciousText).map((tab) => tab.label) })) }));
-  if (failures.length || consoleErrs.length || externalRequests.length) { console.error('AUDIT FAILED'); process.exitCode = 1; }
-  else console.log('AUDIT DONE');
+  if (failures.length || consoleErrs.length || externalRequests.length) { console.error('AUDIT FAILED'); app.exit(1); return; }
+  console.log('AUDIT DONE');
   app.quit();
-}).catch((error) => { console.error('ROLE/SREEN AUDIT CRASHED', error); process.exitCode = 1; app.quit(); });
+}).catch((error) => { console.error('ROLE/SCREEN AUDIT CRASHED', error); app.exit(1); });

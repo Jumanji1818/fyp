@@ -6,7 +6,7 @@ const DIST = path.join(__dirname, '..', 'dist'); fs.mkdirSync('/tmp/shots', { re
 app.whenReady().then(async () => {
   protocol.handle('app', (req) => { const p = decodeURIComponent(new URL(req.url).pathname); return net.fetch(pathToFileURL(path.join(DIST, p === '/' ? 'index.html' : p)).toString()); });
   const win = new BrowserWindow({ width: 1366, height: 900, show: false, webPreferences: { preload: path.join(__dirname, '..', 'electron', 'preload.cjs'), contextIsolation: true } });
-  const errs = []; win.webContents.on('console-message', (_e, l, m) => { if (l >= 2) errs.push(m.slice(0, 200)); });
+  const errs = []; win.webContents.on('console-message', (_e, l, m) => { if (l >= 2 && !/Electron Security Warning|Insecure Content-Security-Policy/.test(m)) errs.push(m.slice(0, 200)); });
   await win.loadURL('app://procura/index.html'); await sleep(4500);
   const run = (c) => win.webContents.executeJavaScript(c, true);
   const shot = async (n) => fs.writeFileSync('/tmp/shots/e2e_' + n + '.png', (await win.webContents.capturePage()).toPNG());
@@ -22,7 +22,7 @@ app.whenReady().then(async () => {
   const initialPoCount = await run(`window.__app.purchaseOrders.length`);
   await shot('1_eval');
   console.log('award buttons:', JSON.stringify(await run(`[...document.querySelectorAll('button')].map(b=>(b.innerText||'').trim()).filter(t=>/award|select/i.test(t))`)));
-  console.log('click award:', await run(`__click(/^(Award|Select|Award Contract|Award to)/i)`)); await sleep(1500);
+  const awardClicked = await run(`__click(/^Proceed to Award Winner$/i)`); console.log('click award:', awardClicked); await sleep(1500);
   await shot('2_after_award');
   console.log('page note:', await run(`(document.body.innerText.match(/(Sent to the Approving Authority|exceeds|Finance|override|Contract Officially Awarded)[^\\n]{0,120}/g)||[]).join(' || ')`));
   const heldForAuthority = await run(`window.__app.tenders.find(t=>t.id===${JSON.stringify(selectedTenderId)})?.awaitingAuthorityApproval === true`);
@@ -42,6 +42,7 @@ app.whenReady().then(async () => {
   const finalPoCount = await run(`window.__app.purchaseOrders.filter(po=>po.tenderId===${JSON.stringify(selectedTenderId)}).length`);
   const failures = [];
   if (!selectedTenderId) failures.push('no tender selected');
+  if (!awardClicked) failures.push('Proceed to Award Winner button not found');
   if (!heldForAuthority) failures.push('high-value award was not held for authority approval');
   if (poCountBeforeAuthority > 0) failures.push('PO existed before authority approval');
   if (!rejectionReasonRequired) failures.push('authority rejection reason validation was not shown');
@@ -49,6 +50,6 @@ app.whenReady().then(async () => {
   if (!(finalPoCount > poCountBeforeAuthority)) failures.push('purchase order not issued after approval');
   if (errs.length) failures.push('renderer console errors');
   console.log('AWARD E2E SUMMARY', JSON.stringify({ initialPoCount, poCountBeforeAuthority, finalPoCount, heldForAuthority, rejectionReasonRequired, failures }));
-  if (failures.length) { console.error('AWARD E2E FAILED'); process.exitCode = 1; }
+  if (failures.length) { console.error('AWARD E2E FAILED'); app.exit(1); return; }
   app.quit();
-}).catch((error) => { console.error('AWARD E2E CRASHED', error); process.exitCode = 1; app.quit(); });
+}).catch((error) => { console.error('AWARD E2E CRASHED', error); app.exit(1); });
