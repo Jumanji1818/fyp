@@ -114,6 +114,8 @@ interface AppContextType {
   createTenderFromRequest: (requestId: string, tenderData: Partial<Tender>) => Tender;
   extendTenderDeadline: (tenderId: string, newDate: string, reason: string) => void;
   cancelTender: (tenderId: string, reason: string) => void;
+  cancelRequest: (requestId: string, reason: string) => void;
+  cancelPurchaseOrder: (poId: string, reason: string) => void;
   submitBid: (tenderId: string, bidData: Partial<Bid>) => Bid;
   evaluateCompliance: (bidId: string, passed: boolean, reason?: string) => void;
   evaluateTechnical: (bidId: string, score: number, comments: string) => void;
@@ -1290,6 +1292,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const cancelTender = (tenderId: string, reason: string) => {
+    const target = tenders.find((t) => t.id === tenderId);
+    if (!target || !reason.trim() || !['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') || target.status === 'Cancelled') return;
+    const linkedPO = purchaseOrders.find((po) => po.tenderId === tenderId);
+    if (linkedPO && !cancelPurchaseOrder(linkedPO.id, reason)) return;
     setTenders((prev) =>
       prev.map((t) => {
         if (t.id === tenderId) {
@@ -1303,6 +1309,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return t;
       })
     );
+    const request = requests.find((r) => r.id === target.requestId);
+    addNotification({ forRole: 'Procurement Officer', title: 'Tender Cancelled', message: `${target.referenceNumber} was cancelled. Reason: ${reason.trim()}`, type: 'danger', recordType: 'tender', recordId: tenderId });
+    if (request) addNotification({ userId: request.requesterId, title: 'Tender Cancelled', message: `Tender ${target.referenceNumber} for your request ${request.referenceNumber} was cancelled: ${reason.trim()}`, type: 'warning', recordType: 'tender', recordId: tenderId });
+  };
+
+  const cancelRequest = (requestId: string, reason: string) => {
+    const request = requests.find((entry) => entry.id === requestId);
+    if (!request || !reason.trim() || request.status === 'Cancelled' || request.status === 'Converted to Tender') return;
+    const isOwner = currentUser?.id === request.requesterId;
+    const isAdmin = ['Organization Admin', 'Department Head'].includes(currentUser?.role || '');
+    if (!isOwner && !isAdmin) return;
+    setRequests((prev) => prev.map((entry) => entry.id === requestId ? { ...entry, status: 'Cancelled', updatedAt: new Date().toISOString(), reviewComment: reason.trim() } : entry));
+    addAuditLog('Cancelled Purchase Request', request.referenceNumber, request.status, 'Cancelled', reason.trim());
+    addNotification({ forRole: 'Department Head', title: 'Purchase Request Cancelled', message: `${request.referenceNumber} was cancelled by ${currentUser?.fullName || 'a user'}: ${reason.trim()}`, type: 'warning', recordType: 'request', recordId: requestId });
+    addNotification({ forRole: 'Procurement Officer', title: 'Purchase Request Cancelled', message: `${request.referenceNumber} is no longer available for sourcing.`, type: 'info', recordType: 'request', recordId: requestId });
+  };
+
+  const cancelPurchaseOrder = (poId: string, reason: string): boolean => {
+    const po = purchaseOrders.find((entry) => entry.id === poId);
+    if (!po || !reason.trim() || !['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '') || ['Delivered', 'Closed', 'Cancelled'].includes(po.status)) return false;
+    const release = Math.max(0, po.totalAmount - po.paidAmount);
+    setPurchaseOrders((prev) => prev.map((entry) => entry.id === poId ? { ...entry, status: 'Cancelled' } : entry));
+    setDepartments((prev) => prev.map((entry) => entry.id === po.departmentId ? { ...entry, committed: Math.max(0, entry.committed - release) } : entry));
+    setTenders((prev) => prev.map((entry) => entry.id === po.tenderId ? { ...entry, status: 'Cancelled', awaitingAuthorityApproval: false, pendingAuthorityBidId: undefined, cancellationReason: reason.trim() } : entry));
+    addAuditLog('Cancelled Purchase Order', po.referenceNumber, po.status, 'Cancelled', `Released remaining commitment ₦${release.toLocaleString()}. Reason: ${reason.trim()}`);
+    addNotification({ userId: vendors.find((vendor) => vendor.id === po.vendorId)?.userId, forRole: 'Vendor', title: 'Purchase Order Cancelled', message: `${po.referenceNumber} was cancelled: ${reason.trim()}`, type: 'danger', recordType: 'po', recordId: poId });
+    addNotification({ forRole: 'Finance Officer', title: 'Purchase Order Cancelled', message: `${po.referenceNumber} was cancelled. ₦${release.toLocaleString()} of unpaid commitment was released.`, type: 'warning', recordType: 'po', recordId: poId });
+    return true;
   };
 
   // Vendor Bidding - Enforce single bid submission per vendor (Section 6.4)
@@ -1310,7 +1344,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const tnd = tenders.find((t) => t.id === tenderId);
     const vendor = vendors.find((v) => v.id === (bidData.vendorId || currentUser?.vendorId));
     if (!tnd) throw new Error('This tender no longer exists.');
-    if (!vendor) throw new Error('Your vendor profile could not be found. Please sign in again.');
+    if (currentUser?.role !== 'Vendor' || !currentUser.vendorId || currentUser.vendorId !== (bidData.vendorId || currentUser.vendorId)) throw new Error('Only the signed-in vendor may submit a bid for their own account.');
+    if (!vendor || vendor.id !== currentUser.vendorId) throw new Error('Your vendor profile could not be found. Please sign in again.');
     if (tnd.status !== 'Open') throw new Error('This tender is not open for bidding.');
     if (new Date(tnd.bidClosingDateTime).getTime() < Date.now()) throw new Error('The bid closing time for this tender has passed.');
     if (!vendor.categories.some((c) => tnd.categories.includes(c))) throw new Error('Your registered supply categories do not match this tender.');
@@ -1326,12 +1361,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return existing; // Vendor can only submit a bid once per tender!
     }
 
-    // Check if vendor is suspended specifically by the procuring organization
-    if (vendor && tnd?.organizationId) {
-      const eff = getVendorEffectiveStatus(vendor, tnd.organizationId);
-      if (eff.status === 'Suspended' || eff.status === 'Blacklisted') {
-        throw new Error(`Vendor ${vendor.businessName} is currently ${eff.status.toLowerCase()} by this organization.`);
-      }
+    // Vendors must be explicitly approved by this organization before bidding.
+    const effectiveStatus = getVendorEffectiveStatus(vendor, tnd.organizationId || currentOrganization.id);
+    if (effectiveStatus.status !== 'Approved') {
+      throw new Error(effectiveStatus.status === 'Suspended' || effectiveStatus.status === 'Blacklisted'
+        ? `Vendor ${vendor.businessName} is currently ${effectiveStatus.status.toLowerCase()} by this organization.`
+        : 'Your vendor account must be approved by Procurement before you can bid.');
     }
 
     const ref = nextRef('BID', bids.map((b) => b.referenceNumber));
@@ -1768,7 +1803,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const acceptedNow = receipt.acceptedQuantities;
     const newReceived = receipt.receivedQuantities;
     const isFull = receipt.isFullyDelivered;
-    if (acceptedNow.every((n) => n === 0)) return; // nothing accepted - nothing to record
+    if (acceptedNow.every((n) => n === 0) && !itemsReceived.some((item) => item.status === 'Rejected')) return; // record rejected deliveries for audit and reliability.
 
     const newDelivery: DeliveryRecord = {
       id: 'del-' + Date.now(),
@@ -1795,8 +1830,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (p.id === poId) {
           return {
             ...p,
-            status: isFull ? 'Delivered' : 'Partially Delivered',
-            actualDeliveryDate: todayStr,
+            status: isFull ? 'Delivered' : acceptedNow.some((quantity) => quantity > 0) ? 'Partially Delivered' : p.status,
+            actualDeliveryDate: acceptedNow.some((quantity) => quantity > 0) ? todayStr : p.actualDeliveryDate,
             deliveredOnTime: isOnTime,
             lateDays,
             items: p.items.map((it, idx) => ({
@@ -1813,15 +1848,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setVendors((prev) =>
       prev.map((v) => {
         if (v.id === po.vendorId) {
-          const onTime = isOnTime ? v.onTimeDeliveries + 1 : v.onTimeDeliveries;
-          const late = !isOnTime ? v.lateDeliveries + 1 : v.lateDeliveries;
+          const isFirstCompleteReceipt = isFull && !deliveries.some((delivery) => delivery.purchaseOrderId === poId && delivery.isFullyDelivered);
+          const onTime = v.onTimeDeliveries + (isFirstCompleteReceipt && isOnTime ? 1 : 0);
+          const late = v.lateDeliveries + (isFirstCompleteReceipt && !isOnTime ? 1 : 0);
           const rejected = v.rejections + itemsReceived.filter((item) => item.status === 'Rejected').length;
           return {
             ...v,
             onTimeDeliveries: onTime,
             lateDeliveries: late,
             rejections: rejected,
-            totalOrders: v.totalOrders + 1,
+            totalOrders: v.totalOrders + (isFirstCompleteReceipt ? 1 : 0),
             reliabilityScore: calculateReliabilityScore(onTime, late, rejected),
           };
         }
@@ -1987,7 +2023,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Budget Adjustments
   const adjustBudget = (deptId: string, newBudget: number, reason: string) => {
     const dept = departments.find((d) => d.id === deptId);
-    if (!dept) return;
+    if (!dept || !Number.isFinite(newBudget) || newBudget <= 0 || !reason.trim()) return;
+    if (!['Finance Officer', 'Organization Admin'].includes(currentUser?.role || '')) return;
+    if (newBudget < dept.spent + dept.committed) return;
 
     const oldBudget = dept.annualBudget;
     const newChange: BudgetChange = {
@@ -2148,7 +2186,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (data.payments) setPayments(data.payments);
       if (data.notifications) setNotifications(data.notifications);
       if (data.budgetOverrideRequests && Array.isArray(data.budgetOverrideRequests)) setBudgetOverrideRequests(data.budgetOverrideRequests);
-      if (data.auditLogs && Array.isArray(data.auditLogs)) setAuditLogs((existing) => mergeAuditLogAppendOnly(existing, data.auditLogs));
+      // Audit history is intentionally excluded from imports; only audited application actions may append entries.
       return true;
     } catch {
       return false;
@@ -2220,6 +2258,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         createTenderFromRequest,
         extendTenderDeadline,
         cancelTender,
+        cancelRequest,
+        cancelPurchaseOrder,
         submitBid,
         evaluateCompliance,
         evaluateTechnical,
