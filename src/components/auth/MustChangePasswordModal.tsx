@@ -17,7 +17,7 @@ export const MustChangePasswordModal: React.FC = () => {
     return null;
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -31,8 +31,8 @@ export const MustChangePasswordModal: React.FC = () => {
       return;
     }
 
-    if (newPass.length < 6) {
-      setErrorMsg('New password must be at least 6 characters.');
+    if (newPass.length < 8) {
+      setErrorMsg('New password must be at least 8 characters.');
       return;
     }
 
@@ -41,7 +41,7 @@ export const MustChangePasswordModal: React.FC = () => {
       return;
     }
 
-    const result = changeTempPassword(currentUser.id, currentPass, newPass);
+    const result = await changeTempPassword(currentUser.id, currentPass, newPass);
     if (result.success) {
       setSuccess(true);
     } else {
@@ -118,7 +118,7 @@ export const MustChangePasswordModal: React.FC = () => {
                   required
                   value={newPass}
                   onChange={(e) => setNewPass(e.target.value)}
-                  placeholder="Minimum 6 characters"
+                  placeholder="Minimum 8 characters"
                   className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#07130E] border border-[#1F3A2D] text-[#F2EFE6] focus:border-[#D4AF37] outline-none font-mono"
                 />
                 <Lock className="w-4 h-4 text-[#A8B5AB] absolute left-3 top-2.5" />

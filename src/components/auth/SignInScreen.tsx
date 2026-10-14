@@ -64,13 +64,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
     return () => clearInterval(timer);
   }, [lockoutSeconds]);
 
-  const fillAccount = (accEmail: string, accPass: string = 'Procura@2026') => {
-    setEmail(accEmail);
-    setPassword(accPass);
-    setErrorMessage('');
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (lockoutSeconds > 0) return;
 
@@ -82,26 +76,26 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
     setErrorMessage('');
     setLoading(true);
 
-    setTimeout(() => {
-      const result = login(email.trim(), password);
+    try {
+      const result = await login(email.trim(), password);
       if (result.success) {
-        setLoading(false);
+        setFailedAttempts(0);
         onSuccess();
       } else {
-        setLoading(false);
         const newAttempts = failedAttempts + 1;
         setFailedAttempts(newAttempts);
-
         if (newAttempts >= 5) {
-          setLockoutSeconds(300); // 5 minutes lockout
-          setErrorMessage('Account temporarily locked due to multiple failed attempts. Please wait 5 minutes.');
+          setLockoutSeconds(300);
+          setErrorMessage('Too many attempts. Please wait 5 minutes before trying again.');
         } else {
           setErrorMessage(result.error || 'Invalid email or password.');
           setShake(true);
           setTimeout(() => setShake(false), 500);
         }
       }
-    }, 400);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const OrgIcon =
@@ -238,7 +232,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
           {/* Email / Phone */}
           <div>
             <label className="block text-[#A8B5AB] font-medium mb-1.5">
-              Email or Phone Number
+              Email Address
             </label>
             <div className="relative">
               <input
@@ -329,27 +323,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
             )}
           </button>
         </form>
-
-        {/* Selected Organization Quick-Fill Account helper */}
-        {orgAdmin && (
-          <div className="mt-4 p-2.5 rounded-xl bg-[#07130E]/70 border border-[#1F3A2D] flex items-center justify-between text-xs">
-            <div className="truncate pr-2">
-              <span className="text-[10px] text-[#A8B5AB] block">
-                {currentOrganization.name} Admin:
-              </span>
-              <span className="font-medium text-[#F2EFE6] text-[11px] truncate block">
-                {orgAdmin.fullName} ({orgAdmin.email})
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => fillAccount(orgAdmin.email)}
-              className="px-2.5 py-1 rounded-lg bg-[#132A20] hover:bg-[#1F6F4A] text-[#D4AF37] hover:text-white border border-[#D4AF37]/30 text-[10px] font-semibold shrink-0 transition-colors"
-            >
-              Fill Account
-            </button>
-          </div>
-        )}
 
         {/* Simple, Uncluttered Footer Links */}
         <div className="mt-6 pt-4 border-t border-[#1F3A2D] text-center text-xs text-[#A8B5AB] space-y-2">

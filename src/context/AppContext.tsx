@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { procuraApi, ApiUser } from '../lib/procuraApi';
 import {
   Organization,
   OrganizationType,
@@ -69,7 +70,8 @@ interface AppContextType {
     tempPassword?: string;
     mustChangePassword?: boolean;
   }) => { success: boolean; user?: User; tempPassword: string; error?: string };
-  changeTempPassword: (userId: string, currentPass: string, newPass: string) => { success: boolean; error?: string };
+  changeTempPassword: (userId: string, currentPass: string, newPass: string) => Promise<{ success: boolean; error?: string }>;
+  resetUserPassword: (userId: string, newPass: string) => { success: boolean; error?: string };
   settings: OrganizationSettings;
   updateSettings: (newSettings: Partial<OrganizationSettings>) => void;
   departments: Department[];
@@ -92,7 +94,7 @@ interface AppContextType {
   toggleTheme: () => void;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (c: boolean) => void;
-  login: (email: string, pass: string) => { success: boolean; error?: string; mustChangePassword?: boolean };
+  login: (email: string, pass: string) => Promise<{ success: boolean; error?: string; mustChangePassword?: boolean }>;
   logout: () => void;
   switchUser: (userId: string) => void;
   loadDemoData: () => void;
@@ -207,11 +209,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return list.map((d) => (d.organizationId ? d : { ...d, organizationId: 'org-emerald' }));
   });
 
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'users');
-    const list: User[] = saved ? JSON.parse(saved) : INITIAL_USERS;
-    return list.map((u) => (u.organizationId || u.role === 'Vendor' ? u : { ...u, organizationId: 'org-emerald' }));
-  });
+  // Authentication identities are server-owned. Never initialize or persist user/password records from browser storage.
+  const [users, setUsers] = useState<User[]>([]);
 
   const [categories, setCategories] = useState<Category[]>(() => {
     const saved = localStorage.getItem(STORAGE_PREFIX + 'categories');
@@ -314,9 +313,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     localStorage.setItem(STORAGE_PREFIX + 'departments', JSON.stringify(departments));
   }, [departments]);
-  useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'users', JSON.stringify(users));
-  }, [users]);
   useEffect(() => {
     localStorage.setItem(STORAGE_PREFIX + 'categories', JSON.stringify(categories));
   }, [categories]);
@@ -463,56 +459,52 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Auth, Organization & Staff Provisioning
-  const login = (email: string, _pass: string) => {
-    const found = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (found) {
-      if (found.status === 'Pending') {
-        return { success: false, error: 'Your account is pending administrator approval.' };
-      }
-      if (found.status === 'Deactivated') {
-        return { success: false, error: 'Your account has been deactivated. Contact Admin.' };
-      }
-
-      // If user belongs to an organization, switch active organization to theirs
-      let targetOrg = currentOrganization;
-      if (found.organizationId) {
-        const org = organizations.find((o) => o.id === found.organizationId);
-        if (org) {
-          targetOrg = org;
-          setCurrentOrganization(org);
-          setSettings((prev) => ({
-            ...prev,
-            name: org.name,
-            type:
-              org.type === 'sole_proprietorship'
-                ? 'Sole Proprietor / Small Business'
-                : org.type === 'mega_corporation'
-                ? 'Mega Corporation / Public Parastatal'
-                : 'Enterprise / Corporate',
-            approvalThreshold: org.approvalThreshold,
-            currency: org.currency || '₦',
-            address: org.address,
-            phone: org.phone,
-            email: org.email,
-          }));
+  const login = async (email: string, pass: string) => {
+    try {
+      const response = await procuraApi.login(email.trim(), pass);
+      const apiUser: ApiUser = response.user;
+      const signedInUser: User = {
+        id: apiUser.id,
+        organizationId: apiUser.organizationId || undefined,
+        departmentId: apiUser.departmentId || undefined,
+        vendorId: apiUser.vendorId || undefined,
+        fullName: apiUser.fullName,
+        email: apiUser.email,
+        phone: '',
+        role: apiUser.role as UserRole,
+        status: apiUser.status === 'pending' ? 'Pending' : apiUser.status === 'deactivated' ? 'Deactivated' : 'Active',
+        avatar: apiUser.fullName.substring(0, 2).toUpperCase(),
+        mustChangePassword: apiUser.mustChangePassword,
+        createdAt: new Date().toISOString(),
+      };
+      setCurrentUser(signedInUser);
+      // Never trust a locally selected organization as an authorization boundary.
+      if (apiUser.organizationId) {
+        try {
+          const responseOrg = await procuraApi.currentOrganization();
+          const row = responseOrg.organization;
+          const serverOrg: Organization = {
+            id: String(row.id),
+            name: String(row.name),
+            type: row.type as OrganizationType,
+            industry: String(row.industry || ''),
+            address: String(row.address || ''),
+            phone: String(row.phone || ''),
+            email: String(row.email || ''),
+            approvalThreshold: Number(row.approval_threshold || 0),
+            currency: String(row.currency || 'NGN') === 'NGN' ? '₦' : String(row.currency || '₦'),
+            createdAt: String(row.created_at || new Date().toISOString()),
+          };
+          setCurrentOrganization(serverOrg);
+          setOrganizations((previous) => [serverOrg, ...previous.filter((item) => item.id !== serverOrg.id)]);
+        } catch {
+          // Authentication succeeded; organization details can be refreshed after the API is available.
         }
       }
-
-      setCurrentUser(found);
-      addAuditLog(
-        'User Login',
-        'AUTH',
-        undefined,
-        `Logged in as ${found.role}`,
-        `User ${found.fullName} authenticated successfully in ${targetOrg.name}.`
-      );
-
-      return {
-        success: true,
-        mustChangePassword: !!found.mustChangePassword,
-      };
+      return { success: true, mustChangePassword: apiUser.mustChangePassword };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unable to sign in. Check the API connection.' };
     }
-    return { success: false, error: 'Incorrect email or password.' };
   };
 
   const registerOrganization = (
@@ -664,6 +656,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const switchOrganization = (orgId: string) => {
     const target = organizations.find((o) => o.id === orgId);
     if (!target) return;
+    // Authenticated staff cannot cross organization boundaries by switching UI context.
+    // The login screen can still select an organization before authentication.
+    if (currentUser && currentUser.role !== 'Vendor' && currentUser.organizationId && currentUser.organizationId !== orgId) return;
     setCurrentOrganization(target);
     setSettings((prev) => ({
       ...prev,
@@ -680,17 +675,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       phone: target.phone,
       email: target.email,
     }));
-
-    // If current logged-in user belongs to another organization and is not a global Vendor,
-    // switch to the admin user of the target organization for seamless testing!
-    if (currentUser?.role !== 'Vendor') {
-      const targetAdmin =
-        users.find((u) => u.organizationId === orgId && u.role === 'Organization Admin') ||
-        users.find((u) => u.organizationId === orgId && u.role !== 'Vendor');
-      if (targetAdmin) {
-        setCurrentUser(targetAdmin);
-      }
-    }
 
     addAuditLog(
       'Organization Context Switched',
@@ -750,41 +734,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return { success: true, user: newUser, tempPassword: tempPass };
   };
 
-  const changeTempPassword = (userId: string, _currentPass: string, _newPass: string) => {
-    const target = users.find((u) => u.id === userId);
-    if (!target) return { success: false, error: 'User account not found.' };
-
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          return {
-            ...u,
-            mustChangePassword: false,
-            tempPassword: undefined,
-          };
-        }
-        return u;
-      })
-    );
-
-    if (currentUser?.id === userId) {
-      setCurrentUser((prev) =>
-        prev ? { ...prev, mustChangePassword: false, tempPassword: undefined } : null
-      );
+  const changeTempPassword = async (userId: string, currentPass: string, newPass: string) => {
+    if (!currentUser || currentUser.id !== userId) return { success: false, error: 'Sign in to the account whose password you are changing.' };
+    if (newPass.length < 8) return { success: false, error: 'Password must be at least 8 characters.' };
+    try {
+      await procuraApi.changePassword(currentPass, newPass);
+      setCurrentUser((previous) => previous ? { ...previous, mustChangePassword: false } : null);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unable to change password.' };
     }
-
-    addAuditLog(
-      'Updated First-Login Password',
-      target.fullName,
-      'Temporary Password',
-      'Permanent Password Set',
-      'User successfully changed their temporary password on first login.'
-    );
-
-    return { success: true };
   };
 
+  const resetUserPassword = (_userId: string, _newPass: string) => ({
+    success: false,
+    error: 'Secure password recovery is not configured yet. Contact your organization administrator.',
+  });
+
   const logout = () => {
+    void procuraApi.logout().catch(() => {});
     if (currentUser) {
       addAuditLog('User Logout', 'AUTH', `Role: ${currentUser.role}`, 'Logged Out', 'User ended session.');
     }
@@ -1170,19 +1138,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const extendTenderDeadline = (tenderId: string, newDate: string, reason: string) => {
-    setTenders((prev) =>
-      prev.map((t) => {
-        if (t.id === tenderId) {
-          addAuditLog('Extended Tender Deadline', t.referenceNumber, t.bidClosingDateTime, newDate, `Reason: ${reason}`);
-          return {
-            ...t,
-            bidClosingDateTime: newDate,
-            extendedDeadlineReason: reason,
-          };
-        }
-        return t;
-      })
-    );
+    const tender = tenders.find((t) => t.id === tenderId);
+    if (!tender || !currentUser) return;
+    if (!['Procurement Officer', 'Organization Admin'].includes(currentUser.role)) return;
+    if (tender.organizationId && tender.organizationId !== currentOrganization.id) return;
+    const oldDeadline = new Date(tender.bidClosingDateTime).getTime();
+    const proposedDeadline = new Date(newDate).getTime();
+    // A tender can only be extended before its original deadline while it remains open.
+    if (tender.status !== 'Open' || !Number.isFinite(oldDeadline) || oldDeadline <= Date.now()) return;
+    if (!Number.isFinite(proposedDeadline) || proposedDeadline <= oldDeadline || proposedDeadline <= Date.now()) return;
+    if (!reason.trim()) return;
+    setTenders((prev) => prev.map((t) => {
+      if (t.id !== tenderId) return t;
+      addAuditLog('Extended Tender Deadline', t.referenceNumber, t.bidClosingDateTime, newDate, `Reason: ${reason.trim()}`);
+      return { ...t, bidClosingDateTime: newDate, extendedDeadlineReason: reason.trim() };
+    }));
   };
 
   const cancelTender = (tenderId: string, reason: string) => {
@@ -1391,13 +1361,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const tnd = tenders.find((t) => t.id === tenderId);
     const winBid = bids.find((b) => b.id === winningBidId);
     if (!tnd || !winBid) return { requiresAuthority: false, blocked: 'Tender or bid not found.' };
+    // Procurement submits recommendations; Finance may submit a documented budget override.
+    // Only the Approving Authority can finalize an award and generate a purchase order.
+    if (
+      currentUser?.role !== 'Procurement Officer' &&
+      !(currentUser?.role === 'Finance Officer' && !!budgetOverrideReason?.trim())
+    ) return { requiresAuthority: false, blocked: 'Only Procurement can recommend an award; Finance may submit a documented budget override.' };
+    if (tnd.organizationId && tnd.organizationId !== currentOrganization.id) {
+      return { requiresAuthority: false, blocked: 'This tender belongs to another organization.' };
+    }
     if (tnd.status === 'Awarded' || tnd.awaitingAuthorityApproval) {
       return { requiresAuthority: false, blocked: 'This tender has already been awarded or is awaiting authority approval.' };
     }
     if (winBid.tenderId !== tenderId) return { requiresAuthority: false, blocked: 'That bid does not belong to this tender.' };
     if (winBid.compliancePassed === false) return { requiresAuthority: false, blocked: 'This bid failed the compliance check and cannot be awarded.' };
 
-    const vendor = vendors.find((v) => v.id === winBid.vendorId);
     const dept = departments.find((d) => d.id === tnd.departmentId);
 
     // Budget enforcement (only a Finance override reason lets an over-budget award through)
@@ -1408,11 +1386,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     }
 
-    const threshold = currentOrganization.approvalThreshold || settings.approvalThreshold;
-    const requiresAuthority = winBid.totalAmount > threshold;
-
-    if (requiresAuthority) {
-      // High-value: NO purchase order until the Approving Authority signs off
+    {
+      // Every award recommendation requires Approving Authority sign-off before a PO exists.
       setTenders((prev) =>
         prev.map((t) =>
           t.id === tenderId
@@ -1423,13 +1398,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       addNotification({
         forRole: 'Approving Authority',
         title: 'Award Awaiting Your Sign-off',
-        message: `Tender ${tnd.referenceNumber} recommended for ${winBid.vendorName} at \u20a6${winBid.totalAmount.toLocaleString()} exceeds the \u20a6${threshold.toLocaleString()} threshold.`,
+        message: `Tender ${tnd.referenceNumber} has an award recommendation for ${winBid.vendorName} at ${currentOrganization.currency || '₦'}${winBid.totalAmount.toLocaleString()}. Your decision is required before a purchase order can be issued.`,
         type: 'warning',
         recordType: 'tender',
         recordId: tenderId,
       });
       addAuditLog(
-        'High-Value Award Sent for Authority Approval',
+        'Award Recommendation Sent for Authority Approval',
         tnd.referenceNumber,
         'Under Evaluation',
         'Awaiting Approving Authority',
@@ -1438,7 +1413,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return { requiresAuthority: true };
     }
 
-    return finalizeAward(tenderId, winBid, vendor, dept, justification);
+    return { requiresAuthority: true };
   };
 
   const finalizeAward = (
@@ -1648,14 +1623,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Cumulative accepted quantity per PO line (previous deliveries + this one; rejected goods never count)
     const acceptedNow = po.items.map((it, idx) => {
       const rec = itemsReceived[idx];
-      return rec && rec.status === 'Accepted' ? Math.max(0, rec.received) : 0;
+      // Partial acceptance counts toward received quantity; rejected lines never do.
+      const outstanding = Math.max(0, it.quantity - (it.receivedQuantity || 0));
+      return rec && rec.status !== 'Rejected' ? Math.max(0, Math.min(rec.received, outstanding)) : 0;
     });
     const newReceived = po.items.map((it, idx) => Math.min(it.quantity, (it.receivedQuantity || 0) + acceptedNow[idx]));
     const isFull = po.items.every((it, idx) => newReceived[idx] >= it.quantity);
-    if (acceptedNow.every((n) => n === 0)) return; // nothing accepted - nothing to record
+    const hasAcceptedItems = acceptedNow.some((n) => n > 0);
+    const hasRejectedItems = itemsReceived.some((item) => item.status === 'Rejected');
 
+    // Record every inspection, including fully rejected consignments, for a resolution trail.
     const newDelivery: DeliveryRecord = {
       id: 'del-' + Date.now(),
+      organizationId: currentOrganization.id,
       purchaseOrderId: poId,
       poReference: po.referenceNumber,
       vendorId: po.vendorId,
@@ -1669,9 +1649,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       isFullyDelivered: isFull,
       onTime: isOnTime,
       lateDays,
+      resolutionStatus: hasRejectedItems ? 'Pending' : undefined,
     };
 
-    setDeliveries((prev) => [newDelivery, ...prev]);
+    setDeliveries((prev) => [
+      newDelivery,
+      ...prev.map((delivery) =>
+        delivery.purchaseOrderId === poId && delivery.resolutionStatus === 'Pending' && isFull
+          ? { ...delivery, resolutionStatus: 'Resolved' as const, resolutionNotes: `Outstanding quantities were accepted during reinspection on ${todayStr}.` }
+          : delivery
+      ),
+    ]);
 
     // Update PO status
     setPurchaseOrders((prev) =>
@@ -1679,7 +1667,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (p.id === poId) {
           return {
             ...p,
-            status: isFull ? 'Delivered' : 'Partially Delivered',
+            status: isFull ? 'Delivered' : hasAcceptedItems ? 'Partially Delivered' : p.status,
             actualDeliveryDate: todayStr,
             deliveredOnTime: isOnTime,
             lateDays,
@@ -1713,21 +1701,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
 
     addAuditLog(
-      'Store Received Consignment',
+      'Store Receiving Inspection Recorded',
       po.referenceNumber,
       po.status,
-      isFull ? 'Delivered' : 'Partially Delivered',
-      `On-Time: ${isOnTime ? 'Yes' : `Late by ${lateDays} days`}`
+      isFull ? 'Delivered' : hasAcceptedItems ? 'Partially Delivered' : 'Rejected / Resolution Required',
+      `Accepted quantities recorded. Rejected lines: ${itemsReceived.filter((item) => item.status === 'Rejected').length}. On-time: ${isOnTime ? 'Yes' : `Late by ${lateDays} days`}`
     );
 
-    addNotification({
-      forRole: 'Finance Officer',
-      title: 'Delivery Received - Payment Due',
-      message: `Items for ${po.referenceNumber} have been received and verified. Payment is now due.`,
-      type: 'info',
-      recordType: 'po',
-      recordId: po.id,
-    });
+    if (hasRejectedItems) {
+      addNotification({
+        forRole: 'Procurement Officer',
+        title: 'Rejected Delivery Requires Resolution',
+        message: `Inspection for ${po.referenceNumber} includes rejected line items. Arrange replacement, return, or a documented resolution before closure.`,
+        type: 'warning',
+        recordType: 'po',
+        recordId: po.id,
+      });
+    }
+
+    if (hasAcceptedItems) {
+      addNotification({
+        forRole: 'Finance Officer',
+        title: 'Delivery Received - Payment Review',
+        message: `Accepted goods for ${po.referenceNumber} were recorded. Review payment only against accepted quantities and the outstanding PO balance.`,
+        type: 'info',
+        recordType: 'po',
+        recordId: po.id,
+      });
+    }
   };
 
   // Payments
@@ -1871,8 +1872,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Budget Adjustments
   const adjustBudget = (deptId: string, newBudget: number, reason: string) => {
+    if (currentUser?.role !== 'Finance Officer') return;
     const dept = departments.find((d) => d.id === deptId);
-    if (!dept) return;
+    if (!dept || (dept.organizationId && dept.organizationId !== currentOrganization.id)) return;
+    if (!Number.isFinite(newBudget) || newBudget < 0 || !reason.trim()) return;
 
     const oldBudget = dept.annualBudget;
     const newChange: BudgetChange = {
@@ -2051,6 +2054,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         registerOrganization,
         provisionStaffUser,
         changeTempPassword,
+    resetUserPassword,
         settings,
         updateSettings,
         departments,
