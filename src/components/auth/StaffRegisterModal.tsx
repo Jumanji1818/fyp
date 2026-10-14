@@ -70,7 +70,8 @@ export const StaffRegisterModal: React.FC<StaffRegisterModalProps> = ({ isOpen, 
           ? 'Your profile is awaiting Organization Admin verification'
           : 'Create your staff profile. An administrator will assign your system role.'
       }
-      maxWidth="max-w-lg"
+      maxWidth="max-w-2xl"
+      variant="registration"
     >
       {isPending ? (
         <div className="py-8 text-center space-y-5 animate-in zoom-in-95">

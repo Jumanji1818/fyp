@@ -22,6 +22,7 @@ import {
   RequestStatus,
   TenderStatus,
 } from '../types';
+import { createDemoSeed } from '../data/demoSeed';
 import {
   INITIAL_ORGANIZATIONS,
   INITIAL_SETTINGS,
@@ -901,22 +902,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const loadDemoData = () => {
-    setOrganizations(INITIAL_ORGANIZATIONS);
-    setCurrentOrganization(INITIAL_ORGANIZATIONS[0]);
-    setSettings(INITIAL_SETTINGS);
-    setDepartments(INITIAL_DEPARTMENTS);
-    setCategories(INITIAL_CATEGORIES);
-    setUsers(INITIAL_USERS);
-    setVendors(INITIAL_VENDORS);
-    setRequests(INITIAL_REQUESTS);
-    setTenders(INITIAL_TENDERS);
-    setBids(INITIAL_BIDS);
-    setPurchaseOrders(INITIAL_PURCHASE_ORDERS);
-    setDeliveries(INITIAL_DELIVERIES);
-    setPayments(INITIAL_PAYMENTS);
-    setNotifications(INITIAL_NOTIFICATIONS);
-    setAuditLogs(INITIAL_AUDIT_LOGS);
-    setCurrentUser(INITIAL_USERS[0]);
+    const demo = createDemoSeed();
+    setOrganizations(demo.organizations);
+    setCurrentOrganization(demo.organizations[0]);
+    setSettings(demo.settings);
+    setDepartments(demo.departments);
+    setCategories(demo.categories);
+    setUsers(demo.users);
+    setVendors(demo.vendors);
+    setRequests(demo.requests);
+    setTenders(demo.tenders);
+    setBids(demo.bids);
+    setPurchaseOrders(demo.purchaseOrders);
+    setDeliveries(demo.deliveries);
+    setPayments(demo.payments);
+    setNotifications(demo.notifications);
+    setAuditLogs(demo.auditLogs);
+    setCurrentUser(demo.users[0]);
     appStorage.clear();
   };
 

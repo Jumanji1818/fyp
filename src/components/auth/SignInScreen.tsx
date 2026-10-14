@@ -1,4 +1,3 @@
-import { INITIAL_USERS } from '../../data/seedData';
 import React, { useState, useEffect } from 'react';
 import {
   Eye,
@@ -10,12 +9,6 @@ import {
   Loader2,
   AlertCircle,
   Clock,
-  Building2,
-  Scissors,
-  Landmark,
-  ChevronDown,
-  Check,
-  UserCheck,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -34,7 +27,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   onOpenForgotPassword,
   onGoToWelcome,
 }) => {
-  const { login, organizations, currentOrganization, switchOrganization, users } = useApp();
+  const { login } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -42,14 +35,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [shake, setShake] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
-
-  // Available staff/admin accounts for the selected organization
-  const orgStaff = users.filter(
-    (u) => u.organizationId === currentOrganization.id && u.role !== 'Vendor'
-  );
-  const orgAdmin =
-    orgStaff.find((u) => u.role === 'Organization Admin') || orgStaff[0];
 
   // Lockout tracking for 5 failed attempts
   const [failedAttempts, setFailedAttempts] = useState(0);
@@ -64,12 +49,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
     }
     return () => clearInterval(timer);
   }, [lockoutSeconds]);
-
-  const fillAccount = (accEmail: string, accPass: string = 'Procura@2026') => {
-    setEmail(accEmail);
-    setPassword(accPass);
-    setErrorMessage('');
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,13 +84,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
     }, 400);
   };
 
-  const OrgIcon =
-    currentOrganization.type === 'sole_proprietorship'
-      ? Scissors
-      : currentOrganization.type === 'mega_corporation'
-      ? Landmark
-      : Building2;
-
   return (
     <div className="flex-1 flex items-center justify-center p-4 md:p-8 bg-[#07130E] text-[#F2EFE6] min-h-[calc(100vh-2.5rem)] relative overflow-hidden font-sans">
       {/* Subtle background glow */}
@@ -144,80 +116,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
           <p className="text-xs text-[#A8B5AB] mt-0.5">
             Smart Enterprise Procurement Platform
           </p>
-        </div>
-
-        {/* Active Organization Context Selector */}
-        <div className="mb-5 relative" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-between mb-1.5 px-0.5">
-            <span className="text-[11px] font-medium text-[#A8B5AB]">Target Organization</span>
-            <span className="text-[10px] text-[#D4AF37] font-mono">
-              {currentOrganization.type === 'sole_proprietorship'
-                ? 'Sole Proprietor'
-                : currentOrganization.type === 'mega_corporation'
-                ? 'Mega Corporation'
-                : 'Enterprise'}
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setOrgDropdownOpen(!orgDropdownOpen)}
-            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-[#07130E] border border-[#1F3A2D] hover:border-[#D4AF37]/50 transition-all text-xs"
-          >
-            <div className="flex items-center gap-2.5 truncate">
-              <div className="w-6 h-6 rounded-lg bg-[#132A20] flex items-center justify-center shrink-0">
-                <OrgIcon className="w-3.5 h-3.5 text-[#D4AF37]" />
-              </div>
-              <span className="font-semibold text-[#F2EFE6] truncate">
-                {currentOrganization.name}
-              </span>
-            </div>
-            <ChevronDown className="w-4 h-4 text-[#A8B5AB] shrink-0 ml-2" />
-          </button>
-
-          {/* Org Dropdown */}
-          {orgDropdownOpen && (
-            <div className="absolute left-0 right-0 mt-1.5 bg-[#07130E] border border-[#1F3A2D] rounded-xl shadow-2xl p-1.5 z-50 text-xs animate-in fade-in duration-150 max-h-56 overflow-y-auto">
-              <div className="px-2.5 py-1.5 text-[10px] uppercase font-bold text-[#A8B5AB] border-b border-[#1F3A2D] mb-1">
-                Select Active Organization
-              </div>
-              <div className="space-y-1">
-                {organizations.map((org) => {
-                  const isSelected = org.id === currentOrganization.id;
-                  const Icon =
-                    org.type === 'sole_proprietorship'
-                      ? Scissors
-                      : org.type === 'mega_corporation'
-                      ? Landmark
-                      : Building2;
-
-                  return (
-                    <button
-                      key={org.id}
-                      type="button"
-                      onClick={() => {
-                        switchOrganization(org.id);
-                        setOrgDropdownOpen(false);
-                        setEmail('');
-                        setPassword('');
-                      }}
-                      className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors ${
-                        isSelected
-                          ? 'bg-[#132A20] text-[#D4AF37] font-semibold border border-[#D4AF37]/30'
-                          : 'text-[#A8B5AB] hover:text-[#F2EFE6] hover:bg-[#132A20]/50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <Icon className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">{org.name}</span>
-                      </div>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Lockout Warning */}
@@ -324,33 +222,12 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
               </>
             ) : (
               <>
-                <span>Sign In to {currentOrganization.name}</span>
+                <span>Sign In</span>
                 <ArrowRight className="w-4 h-4 text-[#D4AF37]" />
               </>
             )}
           </button>
         </form>
-
-        {/* Selected Organization Quick-Fill Account helper */}
-        {orgAdmin && INITIAL_USERS.some((u) => u.id === orgAdmin.id) && (
-          <div className="mt-4 p-2.5 rounded-xl bg-[#07130E]/70 border border-[#1F3A2D] flex items-center justify-between text-xs">
-            <div className="truncate pr-2">
-              <span className="text-[10px] text-[#A8B5AB] block">
-                {currentOrganization.name} Admin:
-              </span>
-              <span className="font-medium text-[#F2EFE6] text-[11px] truncate block">
-                {orgAdmin.fullName} ({orgAdmin.email})
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => fillAccount(orgAdmin.email)}
-              className="px-2.5 py-1 rounded-lg bg-[#132A20] hover:bg-[#1F6F4A] text-[#D4AF37] hover:text-white border border-[#D4AF37]/30 text-[10px] font-semibold shrink-0 transition-colors"
-            >
-              Fill Account
-            </button>
-          </div>
-        )}
 
         {/* Simple, Uncluttered Footer Links */}
         <div className="mt-6 pt-4 border-t border-[#1F3A2D] text-center text-xs text-[#A8B5AB] space-y-2">

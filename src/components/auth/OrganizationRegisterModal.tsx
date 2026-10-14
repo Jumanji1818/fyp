@@ -133,7 +133,8 @@ export const OrganizationRegisterModal: React.FC<OrganizationRegisterModalProps>
       onClose={onClose}
       title="Register Organization or Business"
       subtitle="Onboard your entity on Procura to manage purchasing, tenders, and vendor contracts."
-      maxWidth="max-w-2xl"
+      maxWidth="max-w-3xl"
+      variant="registration"
     >
       <div className="space-y-5 text-xs text-[#F2EFE6]">
         {/* Step Indicator */}

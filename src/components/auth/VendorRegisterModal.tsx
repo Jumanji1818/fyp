@@ -178,7 +178,8 @@ export const VendorRegisterModal: React.FC<VendorRegisterModalProps> = ({
       onClose={onClose}
       title="Vendor Enterprise Registration"
       subtitle="Register your enterprise to bid on procurement tenders."
-      maxWidth="max-w-2xl"
+      maxWidth="max-w-4xl"
+      variant="registration"
     >
       <div className="space-y-5 text-xs">
         {/* Step indicator */}
