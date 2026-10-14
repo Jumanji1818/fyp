@@ -1224,11 +1224,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Tender Creation & Matching
   const createTenderFromRequest = (requestId: string, tenderData: Partial<Tender>): Tender => {
     const req = requests.find((r) => r.id === requestId);
+    const isSoloOwner = isSoloOwnerFlow(currentOrganization.type, currentUser?.organizationId, currentOrganization.id);
+    if (!req || req.organizationId !== currentOrganization.id || req.status !== 'Approved by Department') {
+      throw new Error('Only an approved request in the active organization can be published as a tender.');
+    }
+    if (!currentUser || (currentUser.role !== 'Procurement Officer' && currentUser.role !== 'Organization Admin' && !isSoloOwner)) {
+      throw new Error('You are not permitted to publish tenders.');
+    }
+    const closingAt = new Date(tenderData.bidClosingDateTime || Date.now() + 14 * 24 * 60 * 60 * 1000).getTime();
+    if (!Number.isFinite(closingAt) || closingAt <= Date.now()) throw new Error('The bid closing time must be in the future.');
     const ref = nextRef('TND', tenders.map((t) => t.referenceNumber));
 
-    // Auto-match vendors by categories
-    const targetCats = tenderData.categories || (req?.items ? [...new Set(req.items.map((i) => i.category))] : []);
+    // Only vendors activated by Procurement for this organization receive opportunities.
+    const targetCats = tenderData.categories || [...new Set(req.items.map((i) => i.category))];
     const matchingVendors = vendors.filter((v) => {
+      if (getVendorEffectiveStatus(v, currentOrganization.id).status !== 'Approved') return false;
       if (tenderData.restrictToMyVendors && !v.inMyVendors) return false;
       return v.categories.some((c) => targetCats.includes(c));
     });
