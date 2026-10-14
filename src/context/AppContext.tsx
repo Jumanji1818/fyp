@@ -2042,6 +2042,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Vendor Directory Management
   const toggleMyVendor = (vendorId: string) => {
+    if (currentUser?.role !== 'Procurement Officer' && !isSoloOwnerFlow(currentOrganization.type, currentUser?.organizationId, currentOrganization.id)) return;
     setVendors((prev) =>
       prev.map((v) => {
         if (v.id === vendorId) {
