@@ -27,7 +27,7 @@ It survives restarts and updates. Use Settings > "Download JSON Backup" for a JS
 
 ## Automated checks (tools/)
 Run with `xvfb-run -a npx electron tools/<file> --no-sandbox` after `npm run build:desktop`:
-`audit-main.cjs` (every role, every screen), `award-e2e.cjs` (high-value award -> Authority -> PO),
+`audit-main.cjs` (every role, every screen), `budget-override-e2e.cjs` (Finance request/reject/approve plus Authority threshold), `award-e2e.cjs` (high-value award -> Authority -> PO),
 `pdf-test.cjs` (single Print/Save PDF), `persist-test.cjs`, and `auth-e2e.cjs` (needs `VITE_E2E=1` build).
 
 
@@ -42,7 +42,8 @@ The unit tests run with `npm test` before the Windows packaging step in the rele
 | Unit tests | `npm test` | PASS (23 tests) |
 | Desktop build | `npm run build:desktop` | PASS |
 | Electron role and screen audit | `xvfb-run -a npx electron tools/audit-main.cjs --no-sandbox` | PASS |
-| Award approval workflow | `xvfb-run -a npx electron tools/award-e2e.cjs --no-sandbox` | PASS |
+| Budget override + Authority workflow | `xvfb-run -a npx electron tools/budget-override-e2e.cjs --no-sandbox` | Added after run #9; pending next CI run |
+| Award approval workflow | `xvfb-run -a npx electron tools/award-e2e.cjs --no-sandbox` | PASS in run #9 |
 | PDF output | `xvfb-run -a npx electron tools/pdf-test.cjs --no-sandbox` | PASS |
 | Authentication | `VITE_E2E=1 npm run build:desktop` then `xvfb-run -a npx electron tools/auth-e2e.cjs --no-sandbox` | PASS |
 | SQLite persistence | `xvfb-run -a npx electron tools/persist-test.cjs run1 --no-sandbox`, then `run2` | PASS |
