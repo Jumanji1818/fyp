@@ -2170,7 +2170,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       vendors,
       requests,
       tenders,
-      bids,
+      bids: visibleBids,
+      bidsRedacted: visibleBids.length !== bids.length,
       purchaseOrders,
       deliveries,
       payments,
@@ -2192,7 +2193,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (data.vendors) setVendors(data.vendors);
       if (data.requests) setRequests(data.requests);
       if (data.tenders) setTenders(data.tenders);
-      if (data.bids) setBids(data.bids);
+      if (data.bidsRedacted) return false; // Never restore an incomplete backup that omitted confidential open-tender bids.
+      if (data.bids && Array.isArray(data.bids)) setBids(data.bids);
       if (data.purchaseOrders) setPurchaseOrders(data.purchaseOrders);
       if (data.deliveries) setDeliveries(data.deliveries);
       if (data.payments) setPayments(data.payments);
