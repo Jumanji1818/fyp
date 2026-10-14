@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createPasswordRecord, verifyPassword, validatePassword, LoginLockout } from './password';
 import {
-  approvalRequiresAuthority, applyAcceptedDelivery, canCommitBudget, canRecordPayment, canVendorBid, remainingCommitmentAfterCancellation, isSoloOwnerFlow,
+  approvalRequiresAuthority, applyAcceptedDelivery, canCommitBudget, canRecordPayment, canVendorBid, remainingCommitmentAfterCancellation, isSoloOwnerFlow, appendAuditEntry,
   canViewBid, calculateReliabilityScore, calculateWeightedScores, resolveBudgetOverride,
 } from './procurementRules';
 import type { Bid, EvaluationWeights, Tender } from '../types';
@@ -95,6 +95,13 @@ describe('procurement controls', () => {
     expect(isSoloOwnerFlow('sole_proprietorship', 'org-husab', 'org-husab')).toBe(true);
     expect(isSoloOwnerFlow('enterprise', 'org-emerald', 'org-emerald')).toBe(false);
     expect(isSoloOwnerFlow('sole_proprietorship', 'org-husab', 'org-emerald')).toBe(false);
+  });
+  it('keeps audit history append-only and ignores duplicate event ids', () => {
+    const original = [{ id: 'audit-1', action: 'Created' }];
+    expect(appendAuditEntry(original, { id: 'audit-2', action: 'Approved' })).toEqual([
+      { id: 'audit-2', action: 'Approved' }, { id: 'audit-1', action: 'Created' },
+    ]);
+    expect(appendAuditEntry(original, { id: 'audit-1', action: 'Tampered' })).toEqual(original);
   });
   it('locks after five failed attempts and unlocks after five minutes', () => {
     const lockout = new LoginLockout();
