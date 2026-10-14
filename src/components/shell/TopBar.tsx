@@ -110,7 +110,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink">
         <button
           onClick={toggleMenu}
-          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#0D1F17] hover:bg-[#132A20] text-[#D4AF37] border border-[#1F3A2D] text-xs font-semibold shadow-sm transition-all active:scale-95 shrink-0"
+          className="flex lg:hidden items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#0D1F17] hover:bg-[#132A20] text-[#D4AF37] border border-[#1F3A2D] text-xs font-semibold shadow-sm transition-all active:scale-95 shrink-0"
           title="Open Navigation Menu"
         >
           <Menu className="w-4 h-4 text-[#D4AF37]" />
