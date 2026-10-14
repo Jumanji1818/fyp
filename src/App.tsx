@@ -23,6 +23,7 @@ import { RequestsModule } from './components/requests/RequestsModule';
 import { DepartmentApprovalsModule } from './components/requests/DepartmentApprovalsModule';
 import { TendersModule } from './components/tenders/TendersModule';
 import { VendorPortalModule } from './components/vendor/VendorPortalModule';
+import { AuthorityApprovalsModule } from './components/evaluation/AuthorityApprovalsModule';
 import { EvaluationModule } from './components/evaluation/EvaluationModule';
 import { PurchaseOrdersModule } from './components/orders/PurchaseOrdersModule';
 import { StoreReceivingModule } from './components/deliveries/StoreReceivingModule';
@@ -241,7 +242,9 @@ const MainApp: React.FC = () => {
                   />
                 )}
 
-                {currentTab === 'awards' && (
+                {currentTab === 'awards' && currentUser?.role === 'Approving Authority' && <AuthorityApprovalsModule />}
+
+                {currentTab === 'awards' && currentUser?.role !== 'Approving Authority' && (
                   <EvaluationModule
                     initialTenderId={navItemId}
                     onNavigateToPO={(poId) => handleNavigate('orders', poId)}

@@ -53,10 +53,9 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({
   } = useApp();
 
   // Allow Procurement Officer, Organization Admin, and Approving Authority to evaluate and award contracts
+  // (The Approving Authority only signs off high-value awards in its own screen - separation of duties)
   const canAwardContract =
-    currentUser?.role === 'Procurement Officer' ||
-    currentUser?.role === 'Organization Admin' ||
-    currentUser?.role === 'Approving Authority';
+    currentUser?.role === 'Procurement Officer' || currentUser?.role === 'Organization Admin';
 
   // Closed tenders ready for evaluation or currently under evaluation for this organization
   const evaluatableTenders = tenders.filter(
@@ -136,7 +135,7 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({
   // Handle Award Click
   const handleAwardBid = (bid: Bid) => {
     if (!canAwardContract) return;
-    if (isAlreadyAwarded || isAwarding) return;
+    if (isAlreadyAwarded || isAwarding || currentTender?.awaitingAuthorityApproval) return;
 
     if (bid.totalAmount > deptRemainingBudget) {
       // Blocked by budget cap! Trigger Finance Override flow (Section 6.6)
@@ -155,13 +154,25 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({
     executeAward(bid.id, 'Standard award to ranked top recommended supplier.');
   };
 
-  const executeAward = (bidId: string, justification?: string) => {
+  const executeAward = (bidId: string, justification?: string, budgetOverride?: string) => {
     setIsAwarding(true);
     const winBid = bids.find((b) => b.id === bidId);
 
     setTimeout(() => {
-      const result = awardTender(currentTender.id, bidId, justification);
+      const result = budgetOverride
+        ? overrideBudgetAndAward(currentTender.id, bidId, budgetOverride)
+        : awardTender(currentTender.id, bidId, justification);
       setIsAwarding(false);
+      if (result.blocked) {
+        setToastMessage('\u26a0 ' + result.blocked);
+        setTimeout(() => setToastMessage(null), 7000);
+        return;
+      }
+      if (result.requiresAuthority) {
+        setToastMessage('\u2713 Sent to the Approving Authority for sign-off. The Purchase Order and Award Letter are issued once it is approved.');
+        setTimeout(() => setToastMessage(null), 9000);
+        return;
+      }
       setCelebrationOpen(true);
 
       // Awarded! Generate and show formal Award Letter (Section 6.6)
@@ -212,7 +223,7 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({
 
   const handleConfirmBudgetOverride = () => {
     if (!budgetOverrideReason.trim() || !selectedWinnerBidId) return;
-    overrideBudgetAndAward(currentTender.id, selectedWinnerBidId, budgetOverrideReason);
+    executeAward(selectedWinnerBidId, `Budget override: ${budgetOverrideReason}`, budgetOverrideReason);
     setBudgetOverrideModalOpen(false);
     setBudgetOverrideReason('');
   };

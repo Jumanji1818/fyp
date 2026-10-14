@@ -198,73 +198,34 @@ button:disabled {
 }
 
 /* =========================================================================
-   PRINT ISOLATION STYLES
-   Ensures that only the official document appears in the print preview / PDF,
-   completely hiding the background app, sidebars, headers, and modal overlays.
+   PRINT / PDF
+   The document is cloned into #print-root and the app (#root) is hidden while
+   printing, so the sheet flows normally across as many A4 pages as it needs.
    ========================================================================= */
-@media print {
-  html, body {
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    color: #12241B !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
-  }
+#print-root { display: none; }
 
-  /* Hide the entire application DOM tree */
-  body * {
-    visibility: hidden !important;
-  }
+body.printing-doc #root { display: none !important; }
+body.printing-doc #print-root {
+  display: block !important;
+  background: #ffffff !important;
+  color: #12241B !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 11pt;
+  line-height: 1.4;
+}
+body.printing-doc { background: #ffffff !important; overflow: visible !important; height: auto !important; }
+body.printing-doc #print-root button,
+body.printing-doc #print-root .no-print { display: none !important; }
+body.printing-doc #print-root tr,
+body.printing-doc #print-root .signature-block,
+body.printing-doc #print-root .acceptance-slip,
+body.printing-doc #print-root .avoid-break {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
 
-  /* Make ONLY the designated document container and its descendants visible */
-  #printable-official-document,
-  #printable-official-document * {
-    visibility: visible !important;
-  }
-
-  /* Position the printable sheet cleanly at the very top-left of the physical paper */
-  #printable-official-document {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 10mm 14mm !important;
-    box-sizing: border-box !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    box-shadow: none !important;
-    border: none !important;
-    display: block !important;
-    font-size: 11pt !important;
-    line-height: 1.4 !important;
-  }
-
-  /* Never print interactive controls or modal toolbars */
-  .no-print,
-  .print\:hidden,
-  button,
-  nav,
-  aside,
-  header {
-    display: none !important;
-  }
-
-  /* Prevent awkward page break splits inside tables and signatures */
-  tr,
-  .signature-block,
-  .acceptance-slip,
-  .avoid-break {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-  }
-
-  @page {
-    size: A4 portrait;
-    margin: 10mm;
-  }
+@page {
+  size: A4 portrait;
+  margin: 12mm;
 }

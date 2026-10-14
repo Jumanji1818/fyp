@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Printer, Download, X, FileText, CheckCircle2, ShieldCheck, Check } from 'lucide-react';
+import { Printer, X, FileText, CheckCircle2, ShieldCheck, Check } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { nairaAmountToWords } from '../../utils/numberToWords';
 
@@ -46,80 +46,52 @@ interface PrintViewModalProps {
 }
 
 export const PrintViewModal: React.FC<PrintViewModalProps> = ({ isOpen, onClose, doc }) => {
-  const { settings, currentOrganization } = useApp();
-  const [downloadedToast, setDownloadedToast] = useState(false);
+  const { settings, currentOrganization, users } = useApp();
+  const [busy, setBusy] = useState(false);
+  const [savedPath, setSavedPath] = useState<string | null>(null);
 
   if (!isOpen || !doc) return null;
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleDownload = () => {
-    const printElem = document.getElementById('printable-official-document');
-    if (!printElem) return;
-
-    const htmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>${doc.type}: ${doc.reference} - ${currentOrganization.name}</title>
-  <style>
-    @page { size: A4 portrait; margin: 12mm; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      margin: 15mm auto;
-      max-width: 210mm;
-      color: #12241B;
-      background: #ffffff;
-      line-height: 1.5;
-      padding: 0 10px;
+  // One action: save the document as a PDF (desktop) or open the print dialog (browser).
+  const handlePrint = async () => {
+    const src = document.getElementById('printable-official-document');
+    if (!src || busy) return;
+    setBusy(true);
+    let root = document.getElementById('print-root');
+    if (!root) {
+      root = document.createElement('div');
+      root.id = 'print-root';
+      document.body.appendChild(root);
     }
-    table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 12px; }
-    th, td { border: 1px solid #E2DCC8; padding: 7px 10px; }
-    th { background-color: #14573A; color: #ffffff; text-align: left; }
-    .text-right { text-align: right; }
-    .text-center { text-align: center; }
-    .font-bold { font-weight: bold; }
-    .letterhead { border-bottom: 2px solid #14573A; padding-bottom: 14px; margin-bottom: 16px; }
-    .badge { display: inline-block; padding: 4px 10px; background: #0B3A27; color: #D4AF37; font-weight: bold; font-size: 12px; border-radius: 4px; }
-    .letter-body p { margin-bottom: 12px; font-size: 13px; text-align: justify; line-height: 1.6; }
-    .signature-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 30px; text-align: center; font-size: 12px; }
-    .signature-line { border-bottom: 1px dashed #14573A; height: 35px; margin-bottom: 6px; }
-    .acceptance-box { border: 2px solid #14573A; background: #FBF9F2; padding: 14px; border-radius: 6px; margin-top: 24px; font-size: 12px; }
-  </style>
-</head>
-<body>
-  ${printElem.innerHTML}
-</body>
-</html>`;
-
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `PROCURA_${doc.type.replace(/\s+/g, '_')}_${doc.reference}.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    setDownloadedToast(true);
-    setTimeout(() => setDownloadedToast(false), 3500);
+    root.innerHTML = src.innerHTML;
+    document.body.classList.add('printing-doc');
+    try {
+      const api = (window as any).procuraDesktop;
+      const fileName = `PROCURA_${doc.type.replace(/\s+/g, '_')}_${doc.reference}.pdf`;
+      if (api?.savePdf) {
+        const res = await api.savePdf(fileName);
+        if (res?.error) alert('Could not create the PDF: ' + res.error);
+        else if (res?.path) { setSavedPath(res.path); setTimeout(() => setSavedPath(null), 5000); }
+      } else {
+        window.print();
+      }
+    } finally {
+      document.body.classList.remove('printing-doc');
+      if (root) root.innerHTML = '';
+      setBusy(false);
+    }
   };
 
   const amountInWords = doc.amount !== undefined ? nairaAmountToWords(doc.amount) : '';
 
-  // Determine officer signatories
-  const procOfficer =
-    doc.awardDetails?.procurementOfficerName ||
-    (currentOrganization.type === 'sole_proprietorship' ? 'Hussain Abdullahi' : 'Chidiebere Okafor');
-  const finOfficer =
-    doc.awardDetails?.financeOfficerName ||
-    (currentOrganization.type === 'sole_proprietorship' ? 'Hussain Abdullahi (Head of Operations)' : 'Folake Oshodi, FCA');
-  const authOfficer =
-    doc.awardDetails?.approvingAuthorityName ||
-    (currentOrganization.type === 'sole_proprietorship' ? 'Hussain Abdullahi (Managing Director)' : 'Babatunde Adeleke (Director General)');
+  // Signatories come from the organisation's real staff (falls back to a blank signature line)
+  const staffName = (role: string) =>
+    users.find((u) => u.role === role && u.status === 'Active' && (u.organizationId ? u.organizationId === currentOrganization.id : true))?.fullName;
+  const isSoleOrg = currentOrganization.type === 'sole_proprietorship';
+  const ownerName = staffName('Organization Admin') || '____________________';
+  const procOfficer = doc.awardDetails?.procurementOfficerName || (isSoleOrg ? ownerName : staffName('Procurement Officer')) || '____________________';
+  const finOfficer = doc.awardDetails?.financeOfficerName || (isSoleOrg ? `${ownerName} (Head of Operations)` : staffName('Finance Officer')) || '____________________';
+  const authOfficer = doc.awardDetails?.approvingAuthorityName || (isSoleOrg ? `${ownerName} (Managing Director)` : staffName('Approving Authority')) || '____________________';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#07130E]/85 backdrop-blur-md overflow-y-auto print:p-0 print:bg-white print:static">
@@ -135,26 +107,19 @@ export const PrintViewModal: React.FC<PrintViewModalProps> = ({ isOpen, onClose,
           </div>
 
           <div className="flex items-center gap-2">
-            {downloadedToast && (
-              <span className="text-[#3FB67A] font-medium flex items-center gap-1 animate-fade-in mr-2">
-                <Check className="w-3.5 h-3.5" /> Saved to downloads
+            {savedPath && (
+              <span className="text-[#3FB67A] font-medium flex items-center gap-1 mr-2">
+                <Check className="w-3.5 h-3.5" /> PDF saved
               </span>
             )}
             <button
-              onClick={handleDownload}
-              title="Save document as self-contained HTML file"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-[#132A20] hover:bg-[#1F3A2D] border border-[#D4AF37]/40 text-[#E8CF7A] font-medium transition-all text-xs active:scale-95 shadow"
-            >
-              <Download className="w-3.5 h-3.5 text-[#D4AF37]" />
-              Save / Download File
-            </button>
-            <button
               onClick={handlePrint}
-              title="Open print view or save as PDF without app chrome"
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/60 text-[#F2EFE6] font-medium hover:brightness-110 transition-all text-xs active:scale-95 shadow"
+              disabled={busy}
+              title="Save this document as a PDF (you can print it from there)"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/60 text-[#F2EFE6] font-medium hover:brightness-110 transition-all text-xs active:scale-95 shadow disabled:opacity-60"
             >
               <Printer className="w-3.5 h-3.5 text-[#D4AF37]" />
-              Print / Save PDF
+              {busy ? 'Preparing...' : 'Print / Save PDF'}
             </button>
             <button
               onClick={onClose}

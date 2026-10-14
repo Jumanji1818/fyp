@@ -26,20 +26,17 @@ jobs:
           rm -f package-lock.json
           npm install --legacy-peer-deps 2>&1 | tee install.log
 
+      - name: Set app version from run number (each push = a new update)
+        run: npm version 1.0.${{ github.run_number }} --no-git-tag-version --allow-same-version 2>&1 | tee version.log
+
       - name: Build web app (desktop mode)
         run: npm run build:desktop 2>&1 | tee web.log
 
-      - name: Package Windows installer and portable exe
+      - name: Package and publish to GitHub Releases
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npx electron-builder --win --publish never 2>&1 | tee pack.log
-
-      - name: Upload Windows app
-        uses: actions/upload-artifact@v4
-        with:
-          name: Procura-Windows
-          path: release/*.exe
-          retention-days: 30
+        run: npx electron-builder --win --publish always 2>&1 | tee pack.log
 
       - name: Save build logs to a branch (always)
         if: always()

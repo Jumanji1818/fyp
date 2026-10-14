@@ -113,13 +113,13 @@ interface AppContextType {
   evaluateCompliance: (bidId: string, passed: boolean, reason?: string) => void;
   evaluateTechnical: (bidId: string, score: number, comments: string) => void;
   calculateVendorRecommendations: (tenderId: string) => Bid[];
-  awardTender: (tenderId: string, winningBidId: string, justification?: string) => { requiresAuthority: boolean; poCreated?: PurchaseOrder };
+  awardTender: (tenderId: string, winningBidId: string, justification?: string) => { requiresAuthority: boolean; poCreated?: PurchaseOrder; blocked?: string };
   authorityApproveAward: (tenderId: string, approved: boolean, reason?: string) => void;
-  overrideBudgetAndAward: (tenderId: string, winningBidId: string, overrideReason: string) => void;
+  overrideBudgetAndAward: (tenderId: string, winningBidId: string, overrideReason: string) => { requiresAuthority: boolean; poCreated?: PurchaseOrder; blocked?: string };
   acknowledgePO: (poId: string) => void;
   dispatchDelivery: (poId: string, notes: string) => void;
   receiveDelivery: (poId: string, itemsReceived: DeliveryRecord['itemsReceived']) => void;
-  recordPayment: (paymentData: Omit<PaymentRecord, 'id' | 'voucherNumber' | 'recordedByUserId' | 'recordedByName'>) => PaymentRecord;
+  recordPayment: (paymentData: Omit<PaymentRecord, 'id' | 'voucherNumber' | 'recordedByUserId' | 'recordedByName'>) => PaymentRecord | null;
   toggleMyVendor: (vendorId: string) => void;
   updateVendorStatus: (vendorId: string, status: VendorProfile['status'], reason?: string, targetOrgId?: string) => void;
   getVendorEffectiveStatus: (vendor: VendorProfile, orgId?: string) => { status: VendorProfile['status']; reason?: string };
@@ -954,7 +954,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   };
 
+  // Next sequential reference number (max existing + 1) - never collides after deletions or across lists
+  const nextRef = (prefix: string, existing: string[]) => {
+    const year = new Date().getFullYear();
+    const re = new RegExp('^' + prefix + '-' + year + '-(\\d+)$');
+    const max = existing.reduce((m, r) => {
+      const x = re.exec(r || '');
+      return x ? Math.max(m, parseInt(x[1], 10)) : m;
+    }, 0);
+    return `${prefix}-${year}-${String(max + 1).padStart(4, '0')}`;
+  };
+
+  // Who may approve / return / reject a purchase request (separation of duties)
+  const canReviewRequest = (r: PurchaseRequest): boolean => {
+    if (!currentUser) return false;
+    if (['Approved by Department', 'Converted to Tender', 'Rejected', 'Cancelled'].includes(r.status)) return false;
+    if (currentOrganization.type === 'sole_proprietorship') return currentUser.role === 'Organization Admin';
+    if (r.requesterId === currentUser.id) return false; // no self-approval
+    if (currentUser.role === 'Organization Admin') return true;
+    if (currentUser.role === 'Department Head') {
+      return !currentUser.departmentId || currentUser.departmentId === r.departmentId;
+    }
+    return false;
+  };
+
   const approveRequest = (id: string, reviewerComment?: string) => {
+    const target = requests.find((r) => r.id === id);
+    if (!target || !canReviewRequest(target)) return;
     const isSole = currentOrganization.type === 'sole_proprietorship';
     const isAdmin = currentUser?.role === 'Organization Admin';
     const approverTitle = isSole
@@ -1004,6 +1030,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const returnRequest = (id: string, comment: string) => {
+    const target = requests.find((r) => r.id === id);
+    if (!target || !canReviewRequest(target)) return;
     setRequests((prev) =>
       prev.map((r) => {
         if (r.id === id) {
@@ -1031,6 +1059,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const rejectRequest = (id: string, reason: string) => {
+    const target = requests.find((r) => r.id === id);
+    if (!target || !canReviewRequest(target)) return;
     setRequests((prev) =>
       prev.map((r) => {
         if (r.id === id) {
@@ -1060,8 +1090,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Tender Creation & Matching
   const createTenderFromRequest = (requestId: string, tenderData: Partial<Tender>): Tender => {
     const req = requests.find((r) => r.id === requestId);
-    const count = tenders.length + 1;
-    const ref = `TND-2026-${count.toString().padStart(4, '0')}`;
+    const ref = nextRef('TND', tenders.map((t) => t.referenceNumber));
 
     // Auto-match vendors by categories
     const targetCats = tenderData.categories || (req?.items ? [...new Set(req.items.map((i) => i.category))] : []);
@@ -1176,7 +1205,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const submitBid = (tenderId: string, bidData: Partial<Bid>): Bid => {
     const tnd = tenders.find((t) => t.id === tenderId);
     const vendor = vendors.find((v) => v.id === (bidData.vendorId || currentUser?.vendorId));
-    const targetVendorId = vendor?.id || bidData.vendorId || 'vendor-1';
+    if (!tnd) throw new Error('This tender no longer exists.');
+    if (!vendor) throw new Error('Your vendor profile could not be found. Please sign in again.');
+    if (tnd.status !== 'Open') throw new Error('This tender is not open for bidding.');
+    if (new Date(tnd.bidClosingDateTime).getTime() < Date.now()) throw new Error('The bid closing time for this tender has passed.');
+    if (!vendor.categories.some((c) => tnd.categories.includes(c))) throw new Error('Your registered supply categories do not match this tender.');
+    const bidTotal = (bidData.items || []).reduce((acc, it) => acc + (it.totalPrice || 0), 0);
+    if (!(bidData.items || []).length || bidTotal <= 0 || (bidData.items || []).some((it) => !(it.unitPrice > 0))) {
+      throw new Error('Every item needs a unit price greater than zero.');
+    }
+    const targetVendorId = vendor.id;
 
     // Check if vendor has already submitted a bid for this tender
     const existing = bids.find((b) => b.tenderId === tenderId && b.vendorId === targetVendorId);
@@ -1192,8 +1230,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     }
 
-    const count = bids.length + 1;
-    const ref = `BID-2026-${count.toString().padStart(4, '0')}`;
+    const ref = nextRef('BID', bids.map((b) => b.referenceNumber));
     const total = (bidData.items || []).reduce((acc, it) => acc + it.totalPrice, 0);
 
     const newBid: Bid = {
@@ -1202,7 +1239,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       tenderId,
       tenderReference: tnd?.referenceNumber || '',
       vendorId: targetVendorId,
-      vendorName: vendor?.businessName || 'Apex Engineering & Supplies Ltd',
+      vendorName: vendor.businessName,
       items: bidData.items || [],
       totalAmount: total,
       proposedDeliveryDate: bidData.proposedDeliveryDate || new Date().toISOString().split('T')[0],
@@ -1348,38 +1385,60 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const awardTender = (
     tenderId: string,
     winningBidId: string,
-    justification?: string
-  ): { requiresAuthority: boolean; poCreated?: PurchaseOrder } => {
+    justification?: string,
+    budgetOverrideReason?: string
+  ): { requiresAuthority: boolean; poCreated?: PurchaseOrder; blocked?: string } => {
     const tnd = tenders.find((t) => t.id === tenderId);
     const winBid = bids.find((b) => b.id === winningBidId);
-    if (!tnd || !winBid) return { requiresAuthority: false };
+    if (!tnd || !winBid) return { requiresAuthority: false, blocked: 'Tender or bid not found.' };
+    if (tnd.status === 'Awarded' || tnd.awaitingAuthorityApproval) {
+      return { requiresAuthority: false, blocked: 'This tender has already been awarded or is awaiting authority approval.' };
+    }
+    if (winBid.tenderId !== tenderId) return { requiresAuthority: false, blocked: 'That bid does not belong to this tender.' };
+    if (winBid.compliancePassed === false) return { requiresAuthority: false, blocked: 'This bid failed the compliance check and cannot be awarded.' };
 
     const vendor = vendors.find((v) => v.id === winBid.vendorId);
     const dept = departments.find((d) => d.id === tnd.departmentId);
-    const requiresAuthority = winBid.totalAmount > settings.approvalThreshold;
 
-    // Direct award and generate Purchase Order with celebration
-    const result = finalizeAward(tenderId, winBid, vendor, dept, justification);
+    // Budget enforcement (only a Finance override reason lets an over-budget award through)
+    if (dept && !budgetOverrideReason) {
+      const remaining = dept.annualBudget - dept.spent - dept.committed;
+      if (winBid.totalAmount > remaining) {
+        return { requiresAuthority: false, blocked: `Award exceeds the ${dept.name} remaining budget. A Finance budget override is required.` };
+      }
+    }
+
+    const threshold = currentOrganization.approvalThreshold || settings.approvalThreshold;
+    const requiresAuthority = winBid.totalAmount > threshold;
 
     if (requiresAuthority) {
+      // High-value: NO purchase order until the Approving Authority signs off
+      setTenders((prev) =>
+        prev.map((t) =>
+          t.id === tenderId
+            ? { ...t, status: 'Under Evaluation', awaitingAuthorityApproval: true, pendingAuthorityBidId: winBid.id }
+            : t
+        )
+      );
       addNotification({
         forRole: 'Approving Authority',
-        title: 'High-Value Award Notification',
-        message: `Tender ${tnd.referenceNumber} awarded at ₦${winBid.totalAmount.toLocaleString()} to ${winBid.vendorName} (exceeds ₦${settings.approvalThreshold.toLocaleString()} threshold).`,
+        title: 'Award Awaiting Your Sign-off',
+        message: `Tender ${tnd.referenceNumber} recommended for ${winBid.vendorName} at \u20a6${winBid.totalAmount.toLocaleString()} exceeds the \u20a6${threshold.toLocaleString()} threshold.`,
         type: 'warning',
         recordType: 'tender',
         recordId: tenderId,
       });
       addAuditLog(
-        'High-Value Contract Awarded',
+        'High-Value Award Sent for Authority Approval',
         tnd.referenceNumber,
         'Under Evaluation',
-        'Awarded',
-        `Contract awarded at ₦${winBid.totalAmount.toLocaleString()} (Statutory threshold exceeded). PO ${result.poCreated?.referenceNumber} generated.`
+        'Awaiting Approving Authority',
+        `${winBid.vendorName} at \u20a6${winBid.totalAmount.toLocaleString()}. ${justification || ''}${budgetOverrideReason ? ' Budget override: ' + budgetOverrideReason : ''}`
       );
+      return { requiresAuthority: true };
     }
 
-    return result;
+    return finalizeAward(tenderId, winBid, vendor, dept, justification);
   };
 
   const finalizeAward = (
@@ -1390,8 +1449,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     justification?: string
   ) => {
     const tnd = tenders.find((t) => t.id === tenderId);
-    const poCount = purchaseOrders.length + 1;
-    const poRef = `PO-2026-${poCount.toString().padStart(4, '0')}`;
+    const poRef = nextRef('PO', purchaseOrders.map((p) => p.referenceNumber));
 
     // Update tender status and store awardedBidId
     setTenders((prev) =>
@@ -1490,6 +1548,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const winBidId = tnd?.pendingAuthorityBidId || bids.find((b) => b.tenderId === tenderId)?.id;
     const winBid = bids.find((b) => b.id === winBidId);
     if (!tnd || !winBid) return;
+    if (currentUser?.role !== 'Approving Authority') return;
+    if (!tnd.awaitingAuthorityApproval) return;
 
     if (approved) {
       const vendor = vendors.find((v) => v.id === winBid.vendorId);
@@ -1516,21 +1576,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const overrideBudgetAndAward = (tenderId: string, winningBidId: string, overrideReason: string) => {
-    const winBid = bids.find((b) => b.id === winningBidId);
     const tnd = tenders.find((t) => t.id === tenderId);
-    const vendor = vendors.find((v) => v.id === winBid?.vendorId);
-    const dept = departments.find((d) => d.id === tnd?.departmentId);
-
-    if (tnd && winBid) {
-      addAuditLog(
-        'Budget Override Approved by Finance',
-        tnd.referenceNumber,
-        'Budget Exceeded',
-        'Override Granted',
-        `Reason: ${overrideReason}`
-      );
-      finalizeAward(tenderId, winBid, vendor, dept, `Budget override: ${overrideReason}`);
-    }
+    if (!tnd) return { requiresAuthority: false, blocked: 'Tender not found.' };
+    addAuditLog(
+      'Budget Override Approved by Finance',
+      tnd.referenceNumber,
+      'Budget Exceeded',
+      'Override Granted',
+      `Reason: ${overrideReason}`
+    );
+    return awardTender(tenderId, winningBidId, `Budget override: ${overrideReason}`, overrideReason);
   };
 
   // PO & Delivery Actions
@@ -1590,9 +1645,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const isOnTime = diffDays <= 0;
     const lateDays = isOnTime ? 0 : diffDays;
 
-    const totalOrdered = po.items.reduce((acc, i) => acc + i.quantity, 0);
-    const totalAccepted = itemsReceived.reduce((acc, i) => (i.status === 'Accepted' ? acc + i.received : acc), 0);
-    const isFull = totalAccepted >= totalOrdered;
+    // Cumulative accepted quantity per PO line (previous deliveries + this one; rejected goods never count)
+    const acceptedNow = po.items.map((it, idx) => {
+      const rec = itemsReceived[idx];
+      return rec && rec.status === 'Accepted' ? Math.max(0, rec.received) : 0;
+    });
+    const newReceived = po.items.map((it, idx) => Math.min(it.quantity, (it.receivedQuantity || 0) + acceptedNow[idx]));
+    const isFull = po.items.every((it, idx) => newReceived[idx] >= it.quantity);
+    if (acceptedNow.every((n) => n === 0)) return; // nothing accepted - nothing to record
 
     const newDelivery: DeliveryRecord = {
       id: 'del-' + Date.now(),
@@ -1625,7 +1685,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             lateDays,
             items: p.items.map((it, idx) => ({
               ...it,
-              receivedQuantity: itemsReceived[idx]?.received || it.receivedQuantity,
+              receivedQuantity: newReceived[idx],
             })),
           };
         }
@@ -1673,10 +1733,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Payments
   const recordPayment = (
     paymentData: Omit<PaymentRecord, 'id' | 'voucherNumber' | 'recordedByUserId' | 'recordedByName'>
-  ): PaymentRecord => {
-    const pvCount = payments.length + 1;
-    const voucherNumber = `PV-2026-${pvCount.toString().padStart(4, '0')}`;
+  ): PaymentRecord | null => {
+    const voucherNumber = nextRef('PV', payments.map((p) => p.voucherNumber));
     const po = purchaseOrders.find((p) => p.id === paymentData.purchaseOrderId);
+    if (!po) return null;
+    if (!['Delivered', 'Partially Delivered'].includes(po.status)) return null; // pay only against received goods
+    const outstanding = po.totalAmount - po.paidAmount;
+    if (!(paymentData.amount > 0) || paymentData.amount > outstanding + 0.005) return null;
 
     const newPayment: PaymentRecord = {
       ...paymentData,

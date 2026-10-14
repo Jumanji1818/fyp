@@ -41,7 +41,9 @@ export const PaymentsModule: React.FC = () => {
   );
 
   // Eligible POs for payment (those with remaining unpaid balance)
-  const payablePOs = orgPOs.filter((po) => po.paidAmount < po.totalAmount && po.status !== 'Cancelled');
+  const payablePOs = orgPOs.filter(
+    (po) => po.paidAmount < po.totalAmount && (po.status === 'Delivered' || po.status === 'Partially Delivered')
+  );
   const selectedPO = orgPOs.find((po) => po.id === selectedPOId) || payablePOs[0];
 
   const orgPayments = payments.filter((p) => {
@@ -78,6 +80,10 @@ export const PaymentsModule: React.FC = () => {
       notes,
     });
 
+    if (!newPayment) {
+      alert('Payment could not be recorded. Check that goods were received and the amount does not exceed the outstanding balance.');
+      return;
+    }
     setRecordModalOpen(false);
 
     // Open green & gold Payment Voucher PDF preview (Section 6.9)

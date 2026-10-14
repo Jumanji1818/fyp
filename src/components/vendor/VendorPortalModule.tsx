@@ -228,7 +228,9 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
     e.preventDefault();
     if (!biddingTender || !legalWarningAck || totalBidAmount <= 0) return;
 
-    const newBid = submitBid(biddingTender.id, {
+    let newBid;
+    try {
+      newBid = submitBid(biddingTender.id, {
       vendorId: currentVendor.id,
       vendorName: currentVendor.businessName,
       items: bidItems,
@@ -238,7 +240,11 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
       uploadedDocuments: uploadedDocs,
       legalWarningAcknowledged: true,
       legalWarningTimestamp: new Date().toISOString(),
-    });
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Your bid could not be submitted.');
+      return;
+    }
 
     setSubmittedBidRef(newBid.referenceNumber);
   };

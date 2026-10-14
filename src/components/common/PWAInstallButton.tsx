@@ -6,8 +6,8 @@ export const PWAInstallButton: React.FC = () => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
 
-  // If already running as an installed standalone app, hide the button
-  if (isInstalled) {
+  // Hide inside the desktop app and when already installed as a standalone app
+  if (isInstalled || (window as any).procuraDesktop) {
     return null;
   }
 

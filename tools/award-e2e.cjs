@@ -1,0 +1,38 @@
+const { app, BrowserWindow, protocol, net } = require('electron');
+const path = require('path'); const fs = require('fs'); const { pathToFileURL } = require('url');
+protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
+const DIST = path.join(__dirname, '..', 'dist'); const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+app.whenReady().then(async () => {
+  protocol.handle('app', (req) => { const p = decodeURIComponent(new URL(req.url).pathname); return net.fetch(pathToFileURL(path.join(DIST, p === '/' ? 'index.html' : p)).toString()); });
+  const win = new BrowserWindow({ width: 1366, height: 900, show: false, webPreferences: { preload: path.join(__dirname, '..', 'electron', 'preload.cjs'), contextIsolation: true } });
+  const errs = []; win.webContents.on('console-message', (_e, l, m) => { if (l >= 2) errs.push(m.slice(0, 200)); });
+  await win.loadURL('app://procura/index.html'); await sleep(4500);
+  const run = (c) => win.webContents.executeJavaScript(c, true);
+  const shot = async (n) => fs.writeFileSync('/tmp/shots/e2e_' + n + '.png', (await win.webContents.capturePage()).toPNG());
+  await run(`window.__click=(re)=>{const b=[...document.querySelectorAll('button,a')].find(x=>re.test((x.innerText||x.title||'').trim()));if(b){b.click();return true}return false};window.__fill=(el,v)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}))};window.__nav=(l)=>{__click(/^\\s*Menu\\s*$/i);return new Promise(r=>setTimeout(()=>{const b=[...document.querySelectorAll('aside nav button')].find(x=>(x.innerText||'').trim()===l);b&&b.click();r(!!b)},400))};window.__login=async(e)=>{__click(/log\\s?out/i);await new Promise(r=>setTimeout(r,800));__click(/^Already have an account|Sign in$/i);await new Promise(r=>setTimeout(r,500));__fill(document.querySelector('input[type=text],input[type=email]'),e);__fill(document.querySelector('input[type=password]'),'x');document.querySelector('button[type=submit]').click();await new Promise(r=>setTimeout(r,1500));return true};true`);
+  await run(`__click(/Load Demo Data/i)`); await sleep(1500);
+  await run(`__login('chidiebere.okonkwo@emeraldcourtestates.ng')`);
+  await run(`__nav('Evaluation & Scoring')`); await sleep(1200);
+  // pick the non-awarded tender
+  console.log('options:', JSON.stringify(await run(`[...document.querySelectorAll('select option')].map(o=>o.value+'='+o.textContent)`)));
+  await run(`(()=>{const s=document.querySelector('select');const o=[...s.options].find(o=>!/Awarded/.test(o.textContent));if(o){Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(s,o.value);s.dispatchEvent(new Event('change',{bubbles:true}))}return true})()`); await sleep(1000);
+  await run(`[...document.querySelectorAll('button')].filter(b=>/Passed Compliance/.test(b.innerText)).forEach(b=>b.click());true`); await sleep(800);
+  await shot('1_eval');
+  console.log('award buttons:', JSON.stringify(await run(`[...document.querySelectorAll('button')].map(b=>(b.innerText||'').trim()).filter(t=>/award|select/i.test(t))`)));
+  console.log('click award:', await run(`__click(/^(Award|Select|Award Contract|Award to)/i)`)); await sleep(1500);
+  await shot('2_after_award');
+  console.log('page note:', await run(`(document.body.innerText.match(/(Sent to the Approving Authority|exceeds|Finance|override|Contract Officially Awarded)[^\\n]{0,120}/g)||[]).join(' || ')`));
+  await run(`__login('babatunde.adeleke@emeraldcourtestates.ng')`);
+  await run(`__nav('High-Value Award Approvals')`); await sleep(1200);
+  console.log('authority sees:', (await run(`document.querySelector('main').innerText.slice(0,260).replace(/\\n+/g,' | ')`)));
+  await shot('3_authority');
+  console.log('reject w/o reason:', await run(`__click(/^Reject$/)`)); await sleep(500);
+  console.log('msg:', await run(`(document.body.innerText.match(/A reason is required[^\\n]*/)||['none'])[0]`));
+  console.log('approve:', await run(`__click(/Approve & issue PO/)`)); await sleep(1200);
+  console.log('after approve:', await run(`(document.body.innerText.match(/Award approved[^\\n]*|Nothing is waiting[^\\n]*/g)||['none']).join(' || ')`));
+  await run(`__login('chidiebere.okonkwo@emeraldcourtestates.ng')`);
+  await run(`__nav('Purchase Orders (PO)')`); await sleep(1200);
+  console.log('POs:', await run(`(document.querySelector('main').innerText.match(/PO-\\d{4}-\\d{4}/g)||[]).filter((v,i,a)=>a.indexOf(v)===i).join(', ')`));
+  console.log('errs:', JSON.stringify(errs));
+  app.quit();
+});

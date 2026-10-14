@@ -750,7 +750,7 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
           ========================================================================= */}
       {role === 'Approving Authority' && (() => {
         const highValueAwaiting = orgTenders.filter(
-          (t) => (t.status === 'Closed' || t.status === 'Under Evaluation') && (t.awaitingAuthorityApproval || true)
+          (t) => !!t.awaitingAuthorityApproval
         );
         const authorizedDecisions = orgTenders.filter((t) => t.status === 'Awarded').length;
 
