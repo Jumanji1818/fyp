@@ -46,8 +46,8 @@ export const ReportsModule: React.FC = () => {
   // Helper to trigger CSV download
   const downloadCSV = (filename: string, rows: string[][]) => {
     const csvContent =
-      'data:text/csv;charset=utf-8,' + rows.map((e) => e.map((val) => `"${val}"`).join(',')).join('\n');
-    const encodedUri = encodeURI(csvContent);
+      'data:text/csv;charset=utf-8,' + encodeURIComponent(rows.map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\r\n'));
+    const encodedUri = csvContent;
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
     link.setAttribute('download', `${filename}.csv`);
@@ -87,23 +87,31 @@ export const ReportsModule: React.FC = () => {
       const rows = [
         ['PO Reference', 'Vendor', 'Received By', 'Delivery Date', 'Timeliness', 'Late Days'],
         ...orgDeliveries.map((d) => [
-          d.poReference,
-          d.vendorName,
-          d.receivedByName,
-          d.receivedDate,
-          d.onTime ? 'On Time' : 'Late',
-          d.lateDays.toString(),
+          d.poReference, d.vendorName, d.receivedByName, d.receivedDate,
+          d.onTime ? 'On Time' : 'Late', d.lateDays.toString(),
         ]),
       ];
       downloadCSV(`Procura_Delivery_Performance_${currentOrganization.name.replace(/\s+/g, '_')}`, rows);
+    } else if (activeReport === 'tender_summary') {
+      const rows = [
+        ['Tender Reference', 'Title', 'Department', 'Status', 'Bid Closing Date/Time'],
+        ...orgTenders.map((t) => [t.referenceNumber, t.title, t.departmentName, t.status, t.bidClosingDateTime]),
+      ];
+      downloadCSV(`Procura_Tender_Summary_${currentOrganization.name.replace(/\s+/g, '_')}`, rows);
+    } else if (activeReport === 'outstanding_payments') {
+      const rows = [
+        ['PO Reference', 'Vendor', 'Department', 'PO Total (NGN)', 'Paid (NGN)', 'Outstanding (NGN)', 'PO Status'],
+        ...orgPOs.filter((po) => po.paidAmount < po.totalAmount && po.status !== 'Cancelled').map((po) => [
+          po.referenceNumber, po.vendorName, po.departmentName, po.totalAmount.toString(),
+          po.paidAmount.toString(), Math.max(0, po.totalAmount - po.paidAmount).toString(), po.status,
+        ]),
+      ];
+      downloadCSV(`Procura_Outstanding_Payments_${currentOrganization.name.replace(/\s+/g, '_')}`, rows);
     } else {
       const rows = [
         ['Department', 'Annual Budget (NGN)', 'Disbursed Spent (NGN)', 'Committed (NGN)', 'Remaining (NGN)'],
         ...orgDepts.map((d) => [
-          d.name,
-          d.annualBudget.toString(),
-          d.spent.toString(),
-          d.committed.toString(),
+          d.name, d.annualBudget.toString(), d.spent.toString(), d.committed.toString(),
           (d.annualBudget - d.spent - d.committed).toString(),
         ]),
       ];
@@ -123,7 +131,7 @@ export const ReportsModule: React.FC = () => {
         { label: 'Organization Entity', value: currentOrganization.name },
         { label: 'Report Category', value: activeReport.replace(/_/g, ' ') },
         { label: 'Fiscal Currency', value: 'Nigerian Naira (NGN ₦)' },
-        { label: 'Audit Checksum', value: 'VERIFIED-ENTERPRISE' },
+        { label: 'Records Included', value: activeReport === 'spend_analysis' ? String(orgPayments.length) : activeReport === 'tender_summary' ? String(orgTenders.length) : activeReport === 'delivery_performance' ? String(orgDeliveries.length) : activeReport === 'budget_utilization' ? String(orgDepts.length) : activeReport === 'outstanding_payments' ? String(orgPOs.filter((po) => po.paidAmount < po.totalAmount && po.status !== 'Cancelled').length) : String(vendors.length) },
       ],
     });
   };
