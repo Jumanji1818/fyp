@@ -135,3 +135,7 @@ export function remainingCommitmentAfterCancellation(totalAmount: number, paidAm
 export function isSoloOwnerFlow(organizationType: string, userOrganizationId?: string, activeOrganizationId?: string): boolean {
   return organizationType === 'sole_proprietorship' && !!userOrganizationId && userOrganizationId === activeOrganizationId;
 }
+
+export function appendAuditEntry<T extends { id: string }>(existing: T[], entry: T): T[] {
+  return existing.some((current) => current.id === entry.id) ? existing : [entry, ...existing];
+}
