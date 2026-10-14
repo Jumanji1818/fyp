@@ -615,7 +615,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       fullName: adminData.fullName,
       email: adminData.email,
       phone: adminData.phone,
-      password: adminData.password,
       role: 'Organization Admin',
       status: 'Active',
       avatar: adminData.fullName.substring(0, 2).toUpperCase(),
@@ -735,56 +734,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return { success: true, user: newUser, tempPassword: tempPass };
   };
 
-  const changeTempPassword = (userId: string, currentPass: string, newPass: string) => {
-    const target = users.find((u) => u.id === userId);
-    if (!target) return { success: false, error: 'User account not found.' };
-    const expectedPassword = target.password || target.tempPassword || 'Procura@2026';
-    if (!target.mustChangePassword || currentPass !== expectedPassword) return { success: false, error: 'The current temporary password is incorrect.' };
+  const changeTempPassword = async (userId: string, currentPass: string, newPass: string) => {
+    if (!currentUser || currentUser.id !== userId) return { success: false, error: 'Sign in to the account whose password you are changing.' };
     if (newPass.length < 8) return { success: false, error: 'Password must be at least 8 characters.' };
-    if (newPass === currentPass) return { success: false, error: 'Choose a password different from your temporary password.' };
-
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          return {
-            ...u,
-            password: newPass,
-            mustChangePassword: false,
-            tempPassword: undefined,
-          };
-        }
-        return u;
-      })
-    );
-
-    if (currentUser?.id === userId) {
-      setCurrentUser((prev) =>
-        prev ? { ...prev, password: newPass, mustChangePassword: false, tempPassword: undefined } : null
-      );
+    try {
+      await procuraApi.changePassword(currentPass, newPass);
+      setCurrentUser((previous) => previous ? { ...previous, mustChangePassword: false } : null);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unable to change password.' };
     }
-
-    addAuditLog(
-      'Updated First-Login Password',
-      target.fullName,
-      'Temporary Password',
-      'Permanent Password Set',
-      'User successfully changed their temporary password on first login.'
-    );
-
-    return { success: true };
   };
 
-  const resetUserPassword = (userId: string, newPass: string) => {
-    const target = users.find((u) => u.id === userId);
-    if (!target) return { success: false, error: 'User account not found.' };
-    if (newPass.length < 8) return { success: false, error: 'Password must be at least 8 characters.' };
-    setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, password: newPass, tempPassword: undefined, mustChangePassword: false } : u));
-    if (currentUser?.id === userId) setCurrentUser((prev) => prev ? { ...prev, password: newPass, tempPassword: undefined, mustChangePassword: false } : null);
-    addAuditLog('Password Reset', target.email, undefined, 'Password Updated', 'Password reset completed after security-answer verification.');
-    return { success: true };
-  };
+  const resetUserPassword = (_userId: string, _newPass: string) => ({
+    success: false,
+    error: 'Secure password recovery is not configured yet. Contact your organization administrator.',
+  });
 
   const logout = () => {
+    void procuraApi.logout().catch(() => {});
     if (currentUser) {
       addAuditLog('User Logout', 'AUTH', `Role: ${currentUser.role}`, 'Logged Out', 'User ended session.');
     }
