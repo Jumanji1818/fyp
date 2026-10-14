@@ -9,7 +9,7 @@ interface ForgotPasswordModalProps {
 }
 
 export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen, onClose }) => {
-  const { users, addAuditLog } = useApp();
+  const { users, resetUserPassword } = useApp();
   const [email, setEmail] = useState('');
   const [step, setStep] = useState<'verify' | 'new_password' | 'done'>('verify');
   const [matchedUser, setMatchedUser] = useState<any>(null);
@@ -26,6 +26,10 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
       setError('No account found with this email address.');
       return;
     }
+    if (!user.securityQuestion || !user.securityAnswer) {
+      setError('Password recovery is not configured for this account. Contact your organization administrator.');
+      return;
+    }
     setMatchedUser(user);
     setStep('new_password');
   };
@@ -34,13 +38,13 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
     e.preventDefault();
     setError('');
 
-    if (matchedUser?.securityAnswer && answer.toLowerCase().trim() !== matchedUser.securityAnswer.toLowerCase().trim()) {
+    if (!matchedUser?.securityAnswer || answer.toLowerCase().trim() !== matchedUser.securityAnswer.toLowerCase().trim()) {
       setError('Incorrect answer to security question.');
       return;
     }
 
     if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError('Password must be at least 8 characters.');
       return;
     }
 
@@ -49,7 +53,11 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
       return;
     }
 
-    addAuditLog('Offline Password Reset', matchedUser.email, undefined, 'Password Updated', 'Reset via security question.');
+    const result = resetUserPassword(matchedUser.id, newPassword);
+    if (!result.success) {
+      setError(result.error || 'Unable to reset password.');
+      return;
+    }
     setStep('done');
   };
 
@@ -68,7 +76,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
       isOpen={isOpen}
       onClose={handleClose}
       title="Reset Password"
-      subtitle="Offline secure reset via verified security question"
+      subtitle="Reset using the security question configured for your account"
       maxWidth="max-w-md"
     >
       {step === 'verify' && (
