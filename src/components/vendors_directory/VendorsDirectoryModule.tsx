@@ -71,6 +71,13 @@ export const VendorsDirectoryModule: React.FC = () => {
     setTimeout(() => setActionFeedback(null), 3000);
   };
 
+  const handleApproveVendor = () => {
+    if (!activeVendor) return;
+    updateVendorStatus(activeVendor.id, 'Approved', `Approved by Procurement for ${currentOrganization.name}`);
+    setActionFeedback(`Vendor approved for ${currentOrganization.name}.`);
+    setTimeout(() => setActionFeedback(null), 3000);
+  };
+
   const handleReinstate = () => {
     if (!activeVendor) return;
     updateVendorStatus(activeVendor.id, 'Approved', `Reinstated for ${currentOrganization.name}`);
@@ -296,21 +303,28 @@ export const VendorsDirectoryModule: React.FC = () => {
             {/* Vendor Management Actions: Suspend / Blacklist / Reinstate (Section 7.2) */}
             <div className="flex items-center justify-between pt-3 border-t border-[#1F3A2D]">
               {canManageVendors && <div className="flex gap-2">
-                {activeEffectiveStatus.status !== 'Suspended' ? (
+                {activeEffectiveStatus.status === 'Registered' ? (
                   <button
-                    onClick={() => setSuspendModalOpen(true)}
-                    className="px-3.5 py-1.5 rounded-lg bg-[#E0A93B]/20 text-[#E0A93B] border border-[#E0A93B]/40 hover:bg-[#E0A93B]/30 font-semibold transition-all active:scale-95"
+                    onClick={handleApproveVendor}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#3FB67A]/20 text-[#3FB67A] border border-[#3FB67A]/40 hover:bg-[#3FB67A]/30 font-semibold transition-all active:scale-95"
                   >
-                    Suspend for {currentOrganization.name}
+                    Approve Vendor
                   </button>
-                ) : (
+                ) : activeEffectiveStatus.status === 'Suspended' ? (
                   <button
                     onClick={handleReinstate}
                     className="px-3.5 py-1.5 rounded-lg bg-[#3FB67A]/20 text-[#3FB67A] border border-[#3FB67A]/40 hover:bg-[#3FB67A]/30 font-semibold transition-all active:scale-95"
                   >
                     Reinstate for {currentOrganization.name}
                   </button>
-                )}
+                ) : activeEffectiveStatus.status === 'Approved' ? (
+                  <button
+                    onClick={() => setSuspendModalOpen(true)}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#E0A93B]/20 text-[#E0A93B] border border-[#E0A93B]/40 hover:bg-[#E0A93B]/30 font-semibold transition-all active:scale-95"
+                  >
+                    Suspend for {currentOrganization.name}
+                  </button>
+                ) : null}
 
                 {activeEffectiveStatus.status !== 'Blacklisted' ? (
                   <button
