@@ -1411,7 +1411,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const evaluateCompliance = (bidId: string, passed: boolean, reason?: string) => {
     const target = bids.find((b) => b.id === bidId);
     const tender = target && tenders.find((t) => t.id === target.tenderId);
-    if (!target || !tender || Date.now() < new Date(tender.bidClosingDateTime).getTime()) return;
+    if (!target || !tender || (tender.organizationId && tender.organizationId !== currentOrganization.id) || Date.now() < new Date(tender.bidClosingDateTime).getTime()) return;
     if (!['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '')) return;
     setBids((prev) =>
       prev.map((b) => {
@@ -1431,7 +1431,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const evaluateTechnical = (bidId: string, score: number, comments: string) => {
     const target = bids.find((b) => b.id === bidId);
     const tender = target && tenders.find((t) => t.id === target.tenderId);
-    if (!target || !tender || Date.now() < new Date(tender.bidClosingDateTime).getTime()) return;
+    if (!target || !tender || (tender.organizationId && tender.organizationId !== currentOrganization.id) || Date.now() < new Date(tender.bidClosingDateTime).getTime()) return;
     if (!['Procurement Officer', 'Organization Admin'].includes(currentUser?.role || '')) return;
     if (!Number.isFinite(score) || score < 0 || score > 100) return;
     setBids((prev) =>
@@ -1451,7 +1451,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const calculateVendorRecommendations = (tenderId: string): Bid[] => {
     const tnd = tenders.find((t) => t.id === tenderId);
-    if (!tnd || !currentUser || !BID_EVALUATOR_ROLES.includes(currentUser.role as UserRole)) return [];
+    if (!tnd || (tnd.organizationId && tnd.organizationId !== currentOrganization.id) || !currentUser || !BID_EVALUATOR_ROLES.includes(currentUser.role as UserRole)) return [];
     if (Date.now() < new Date(tnd.bidClosingDateTime).getTime()) return [];
     const tenderBids = bids.filter((b) => b.tenderId === tenderId && b.compliancePassed !== false);
     if (!tenderBids.length) return [];
@@ -2233,7 +2233,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const visibleBids = bids.filter((bid) => {
     const tender = tenders.find((entry) => entry.id === bid.tenderId);
-    if (!tender || (tender.organizationId && tender.organizationId !== currentOrganization.id)) return false;
+    if (!tender) return false;
+    if (currentUser?.role === 'Vendor') return canViewBid(bid, tender, currentUser.role, currentUser.vendorId);
+    if (tender.organizationId && tender.organizationId !== currentOrganization.id) return false;
     return canViewBid(bid, tender, currentUser?.role, currentUser?.vendorId);
   });
 
