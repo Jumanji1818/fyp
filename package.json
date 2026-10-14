@@ -46,7 +46,7 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
     "vite-plugin-pwa": "^2.0.0",
-    "vitest": "^3.2.4"
+    "vitest": "^4.0.0"
   },
   "description": "Procura - Smart Procurement System (desktop)",
   "author": "Abdulhameed Abdulsalam",
