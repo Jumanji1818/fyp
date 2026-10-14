@@ -70,7 +70,7 @@ interface AppContextType {
     tempPassword?: string;
     mustChangePassword?: boolean;
   }) => { success: boolean; user?: User; tempPassword: string; error?: string };
-  changeTempPassword: (userId: string, currentPass: string, newPass: string) => { success: boolean; error?: string };
+  changeTempPassword: (userId: string, currentPass: string, newPass: string) => Promise<{ success: boolean; error?: string }>;
   resetUserPassword: (userId: string, newPass: string) => { success: boolean; error?: string };
   settings: OrganizationSettings;
   updateSettings: (newSettings: Partial<OrganizationSettings>) => void;
