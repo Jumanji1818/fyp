@@ -3,9 +3,9 @@ if (process.env.PROCURA_USERDATA) app.setPath('userData', process.env.PROCURA_US
 const path = require('path'); const { pathToFileURL } = require('url'); const { ipcMain } = require('electron');
 const { openDatabase } = require('../electron/db.cjs');
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
-const DIST = path.join(__dirname, '..', 'dist'); const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const DIST = path.join(__dirname, '..', 'dist'); let db; const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 app.whenReady().then(async () => {
-  const db = openDatabase(process.env.PROCURA_DB);
+  db = openDatabase(process.env.PROCURA_DB);
   ipcMain.on('db:load-all', (e) => { e.returnValue = db.loadAll(); }); ipcMain.on('db:set', (_e, k, v) => db.setItem(k, v)); ipcMain.on('db:remove', (_e, k) => db.removeItem(k)); ipcMain.on('db:clear', () => db.clear());
   protocol.handle('app', (req) => { const p = decodeURIComponent(new URL(req.url).pathname); return net.fetch(pathToFileURL(path.join(DIST, p === '/' ? 'index.html' : p)).toString()); });
   const win = new BrowserWindow({ width: 1366, height: 900, show: false, webPreferences: { preload: path.join(__dirname, '..', 'electron', 'preload.cjs'), contextIsolation: true } });
@@ -122,6 +122,7 @@ app.whenReady().then(async () => {
   app.quit();
 }).catch((err) => {
   console.error('AUTH E2E FATAL:', err && err.stack ? err.stack : err);
+  try { if (db) db.close(); } catch {}
   process.exitCode = 1;
   app.quit();
 });
