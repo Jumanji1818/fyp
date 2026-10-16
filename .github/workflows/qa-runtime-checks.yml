@@ -47,6 +47,11 @@ jobs:
         run: |
           set -o pipefail
           timeout --kill-after=10s 120s xvfb-run -a npx electron --no-sandbox tools/award-e2e.cjs 2>&1 | tee award-e2e.log
+          grep -Fq 'click award: true' award-e2e.log
+          grep -Fq 'Sent to the Approving Authority' award-e2e.log
+          grep -Fq 'A reason is required when rejecting an award.' award-e2e.log
+          grep -Fq 'Award approved. The Purchase Order has been issued to the vendor.' award-e2e.log
+          grep -Eq 'POs: .*PO-2026-[0-9]{4}' award-e2e.log
       - name: Run persistence and lockout across separate launches
         if: always()
         shell: bash
@@ -78,6 +83,8 @@ jobs:
           set -o pipefail
           export PROCURA_TEST_PDF=/tmp/procura-qa-export.pdf
           timeout --kill-after=10s 120s xvfb-run -a npx electron --no-sandbox tools/pdf-test.cjs 2>&1 | tee pdf-test.log
+          grep -Fq 'pdf exists: true' pdf-test.log
+          grep -Fq 'app visible after: true' pdf-test.log
           test -s "$PROCURA_TEST_PDF"
       - name: Run role and screen audit
         if: always()
