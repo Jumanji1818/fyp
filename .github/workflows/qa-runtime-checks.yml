@@ -1,0 +1,89 @@
+name: Procura Runtime QA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop-runtime:
+    name: Desktop runtime regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install display dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      - name: Build desktop app with test-only hook
+        run: VITE_E2E=1 npm run build:desktop
+      - name: Run authentication end-to-end checks
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 180s xvfb-run -a npx electron --no-sandbox tools/auth-e2e.cjs 2>&1 | tee auth-e2e.log
+          grep -E '^TOTAL [0-9]+/[0-9]+ passed' auth-e2e.log
+      - name: Run award and authority approval workflow
+        if: always()
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 180s xvfb-run -a npx electron --no-sandbox tools/award-e2e.cjs 2>&1 | tee award-e2e.log
+      - name: Run persistence and lockout across separate launches
+        if: always()
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/procura-qa-userdata
+          export PROCURA_USERDATA=/tmp/procura-qa-userdata
+          export PROCURA_DB=/tmp/procura-qa.sqlite
+          timeout 180s xvfb-run -a npx electron --no-sandbox tools/persist-test.cjs run1 2>&1 | tee persist-run1.log
+          timeout 180s xvfb-run -a npx electron --no-sandbox tools/persist-test.cjs run2 2>&1 | tee persist-run2.log
+          grep -q 'correct password logs in? true' persist-run2.log
+          grep -q 'after 5 bad tries, correct password accepted? (should be false = locked) false' persist-run2.log
+          grep -Eqi 'lock message: Too many failed attempts|lock message: locked' persist-run2.log
+          node <<'NODE'
+          const { openDatabase } = require('./electron/db.cjs');
+          const db = openDatabase(process.env.PROCURA_DB);
+          const rows = db.loadAll();
+          const users = JSON.parse(rows['procura_app_v1_users'] || '[]');
+          const persisted = users.some((u) => u.email === 'admin@emeraldcourtestates.ng');
+          console.log('SQLite persisted demo admin after restart:', persisted);
+          console.log('SQLite collections:', Object.keys(rows).length);
+          db.close();
+          if (!persisted) process.exit(1);
+          NODE
+      - name: Run PDF export test
+        if: always()
+        shell: bash
+        run: |
+          set -o pipefail
+          export PROCURA_TEST_PDF=/tmp/procura-qa-export.pdf
+          timeout 180s xvfb-run -a npx electron --no-sandbox tools/pdf-test.cjs 2>&1 | tee pdf-test.log
+          test -s "$PROCURA_TEST_PDF"
+      - name: Run role and screen audit
+        if: always()
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/shots
+          timeout 300s xvfb-run -a npx electron --no-sandbox tools/audit-main.cjs 2>&1 | tee audit-main.log
+          test -s /tmp/audit.json
+      - name: Upload QA logs and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: procura-runtime-qa
+          path: |
+            *.log
+            /tmp/audit.json
+            /tmp/shots/**
+            /tmp/procura-qa-export.pdf
+          if-no-files-found: warn
