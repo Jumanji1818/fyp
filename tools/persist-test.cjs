@@ -14,7 +14,7 @@ app.whenReady().then(async () => {
   protocol.handle('app', (req) => { const p = decodeURIComponent(new URL(req.url).pathname); return net.fetch(pathToFileURL(path.join(DIST, p === '/' ? 'index.html' : p)).toString()); });
   const win = new BrowserWindow({ width: 1366, height: 900, show: false, webPreferences: { preload: path.join(__dirname, '..', 'electron', 'preload.cjs'), contextIsolation: true } });
   await win.loadURL('app://procura/index.html'); await sleep(4500);
-  const run = (c) => win.webContents.executeJavaScript(c, true);
+  const run = (c) => Promise.race([win.webContents.executeJavaScript(c, true), new Promise((_, reject) => setTimeout(() => reject(new Error('Renderer evaluation timed out: ' + c.slice(0, 100))), 15000))]);
   await run(`window.__click=(re)=>{const b=[...document.querySelectorAll('button,a')].find(x=>re.test((x.innerText||x.title||'').trim()));if(b){b.click();return true}return false};window.__fill=(el,v)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}))};window.__try=async(e,p)=>{__fill(document.querySelector('input[type=text],input[type=email]'),e);__fill(document.querySelector('input[type=password]'),p);document.querySelector('button[type=submit]').click();await new Promise(r=>setTimeout(r,1800));return /Log Out/.test(document.body.innerText)};true`);
   const text = () => run(`document.body.innerText.slice(0,300).replace(/\\n+/g,' | ')`);
   if (mode === 'run1') {
@@ -24,7 +24,7 @@ app.whenReady().then(async () => {
   } else {
     console.log('R2 start screen:', await text());
     const hasDemoBtn = await run(`/Load Demo Data/i.test(document.body.innerText)`);
-    console.log('R2 demo button visible (should be false if data persisted):', hasDemoBtn);
+    console.log('R2 welcome/demo entry point visible (not used as a persistence assertion):', hasDemoBtn);
     {
       await run(`__click(/log\\s?out/i)`); await sleep(800); await run(`__click(/^Already have an account|Sign in$/i)`); await sleep(500);
       const E = 'admin@emeraldcourtestates.ng';
@@ -33,9 +33,12 @@ app.whenReady().then(async () => {
       console.log('correct password logs in?', await run(`__try('${E}','Procura@2026')`));
       console.log('name read back from SQLite shown on screen:', await run(`/DB Persisted Admin/.test(document.body.innerText)`));
       await run(`__click(/log\\s?out/i)`); await sleep(800); await run(`__click(/^Already have an account|Sign in$/i)`); await sleep(500);
-      for (let i = 0; i < 6; i++) await run(`__try('chidiebere.okonkwo@emeraldcourtestates.ng','bad${i}')`);
-      console.log('after 6 bad tries, correct password accepted? (should be false = locked)', await run(`__try('chidiebere.okonkwo@emeraldcourtestates.ng','Procura@2026')`));
-      console.log('lock message:', await run(`(document.body.innerText.match(/(Too many|locked|wait)[^\\n]*/i)||['none'])[0]`));
+      for (let i = 0; i < 5; i++) await run(`__try('chidiebere.okonkwo@emeraldcourtestates.ng','bad${i}')`);
+      const lockedLogin = await run(`__try('chidiebere.okonkwo@emeraldcourtestates.ng','Procura@2026')`);
+      const lockMessage = await run(`(document.body.innerText.match(/(Too many|locked|wait)[^\\n]*/i)||['none'])[0]`);
+      console.log('after 5 bad tries, correct password accepted? (should be false = locked)', lockedLogin);
+      console.log('lock message:', lockMessage);
+      if (lockedLogin !== false || !/(Too many|locked|wait)/i.test(lockMessage)) process.exitCode = 1;
     }
   }
   db.close(); app.quit();
