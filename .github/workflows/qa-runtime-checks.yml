@@ -39,14 +39,14 @@ jobs:
           xvfb-run -a timeout --kill-after=10s 120s npx electron --no-sandbox tools/auth-e2e.cjs 2>&1 | tee auth-e2e.log
           grep -E '^TOTAL [0-9]+/[0-9]+ passed' auth-e2e.log
       - name: Run business-rule regression tests (TC5, TC7, TC9, TC10, TC11)
-        if: always()
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -o pipefail
           xvfb-run -a timeout --kill-after=10s 120s npx electron --no-sandbox tools/business-rules-e2e.cjs 2>&1 | tee business-rules-e2e.log
           grep -E '^BUSINESS RULES TOTAL [0-9]+/[0-9]+ passed' business-rules-e2e.log
       - name: Run award and authority approval workflow
-        if: always()
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -o pipefail
@@ -57,7 +57,7 @@ jobs:
           grep -Fq 'Award approved. The Purchase Order has been issued to the vendor.' award-e2e.log
           grep -Eq 'POs: .*PO-2026-[0-9]{4}' award-e2e.log
       - name: Run persistence and lockout across separate launches
-        if: always()
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -o pipefail
@@ -81,7 +81,7 @@ jobs:
           if (!persisted) process.exit(1);
           NODE
       - name: Run PDF export test
-        if: always()
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -o pipefail
@@ -91,7 +91,7 @@ jobs:
           grep -Fq 'app visible after: true' pdf-test.log
           test -s "$PROCURA_TEST_PDF"
       - name: Run role and screen audit
-        if: always()
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -o pipefail
@@ -99,7 +99,7 @@ jobs:
           xvfb-run -a timeout --kill-after=10s 300s npx electron --no-sandbox tools/audit-main.cjs 2>&1 | tee audit-main.log
           test -s /tmp/audit.json
       - name: Upload QA logs and screenshots
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: procura-runtime-qa
