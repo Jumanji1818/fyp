@@ -13,7 +13,7 @@ app.whenReady().then(async () => {
   await win.loadURL('app://procura/index.html'); await sleep(4500);
   const hookReady = await win.webContents.executeJavaScript('!!window.__app && typeof window.__app.login === "function"', true);
   if (!hookReady) { console.error('E2E hook missing. Build the test app with VITE_E2E=1.'); db.close(); app.quit(); process.exitCode = 2; return; }
-  const run = (c) => win.webContents.executeJavaScript(c, true);
+  const run = (c) => Promise.race([win.webContents.executeJavaScript(c, true), new Promise((_, reject) => setTimeout(() => reject(new Error('Renderer evaluation timed out: ' + c.slice(0, 120))), 15000))]);
   await run(`window.__click=(re)=>{const b=[...document.querySelectorAll('button,a')].find(x=>re.test((x.innerText||x.title||'').trim()));if(b){b.click();return true}return false};true`);
   await run(`__click(/Load Demo Data/i)`); await sleep(2000);
   const results = [];
@@ -114,5 +114,9 @@ app.whenReady().then(async () => {
   console.log('\\nTOTAL', passed + '/' + results.length, 'passed; console errors:', JSON.stringify(errs.slice(0, 3)));
   db.close();
   if (passed !== results.length || errs.length) process.exitCode = 1;
+  app.quit();
+}).catch((err) => {
+  console.error('AUTH E2E FATAL:', err && err.stack ? err.stack : err);
+  process.exitCode = 1;
   app.quit();
 });
