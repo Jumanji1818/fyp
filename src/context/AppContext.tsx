@@ -1661,6 +1661,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!tnd || !winBid) return;
     if (currentUser?.role !== 'Approving Authority') return;
     if (!tnd.awaitingAuthorityApproval) return;
+    // Enforce the rejection-reason rule at the state/action layer as well as in the UI.
+    if (!approved && !reason?.trim()) return;
 
     if (approved) {
       const vendor = vendors.find((v) => v.id === winBid.vendorId);
@@ -1689,6 +1691,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const overrideBudgetAndAward = (tenderId: string, winningBidId: string, overrideReason: string) => {
     const tnd = tenders.find((t) => t.id === tenderId);
     if (!tnd) return { requiresAuthority: false, blocked: 'Tender not found.' };
+    if (!overrideReason?.trim()) {
+      return { requiresAuthority: false, blocked: 'A written reason is required for a budget override.' };
+    }
     addAuditLog(
       'Budget Override Approved by Finance',
       tnd.referenceNumber,
