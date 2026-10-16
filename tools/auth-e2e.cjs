@@ -11,12 +11,14 @@ app.whenReady().then(async () => {
   const win = new BrowserWindow({ width: 1366, height: 900, show: false, webPreferences: { preload: path.join(__dirname, '..', 'electron', 'preload.cjs'), contextIsolation: true } });
   const errs = []; win.webContents.on('console-message', (_e, l, m) => { if (l >= 2 && !/Security Warning/.test(m)) errs.push(m.slice(0, 200)); });
   await win.loadURL('app://procura/index.html'); await sleep(4500);
+  const hookReady = await win.webContents.executeJavaScript('!!window.__app && typeof window.__app.login === "function"', true);
+  if (!hookReady) { console.error('E2E hook missing. Build the test app with VITE_E2E=1.'); db.close(); app.quit(); process.exitCode = 2; return; }
   const run = (c) => win.webContents.executeJavaScript(c, true);
   await run(`window.__click=(re)=>{const b=[...document.querySelectorAll('button,a')].find(x=>re.test((x.innerText||x.title||'').trim()));if(b){b.click();return true}return false};true`);
   await run(`__click(/Load Demo Data/i)`); await sleep(2000);
   const results = [];
   const check = (name, ok, extra) => { results.push(ok); console.log((ok ? 'PASS ' : 'FAIL ') + name + (extra ? '  -> ' + extra : '')); };
-  const call = async (expr, wait = 400) => { const r = await run(`(async()=>{const A=window.__app;const r=await (${expr});return JSON.parse(JSON.stringify(r===undefined?null:r))})()`); await sleep(wait); return r; };
+  const call = async (expr, wait = 400) => { const r = await run(`(async()=>{const A=window.__app;if(!A)throw new Error('E2E hook missing');const r=await (${expr});return JSON.parse(JSON.stringify(r===undefined?null:r))})()`); await sleep(wait); return r; };
   const ADMIN = 'admin@emeraldcourtestates.ng';
 
   // --- login basics
@@ -97,6 +99,20 @@ app.whenReady().then(async () => {
   const usersJson = JSON.parse(rows['procura_app_v1_users'] || '[]');
   check('SQLite holds the new users', ['test.officer@emeraldcourtestates.ng','new.hire@emeraldcourtestates.ng','ada@testsupplies.ng','boss@acme.ng'].every((e) => usersJson.some((u) => u.email === e)));
   check('SQLite contains no plaintext passwords', !/Better#Pass9|Hire#Pass123|Vendor#Pass77|Strong#Pass1|Fresh#Pass1/.test(JSON.stringify(rows)));
-  console.log('\nTOTAL', results.filter(Boolean).length + '/' + results.length, 'passed; console errors:', JSON.stringify(errs.slice(0, 3)));
-  db.close(); app.quit();
+
+  // --- five-attempt lockout (use the newly registered organization account)
+  await call(`A.logout()`);
+  for (let i = 1; i <= 5; i++) {
+    const failed = await call(`A.login('boss@acme.ng','wrong-password-${i}')`, 100);
+    check(`lockout attempt ${i} rejects incorrect password`, failed.success === false);
+  }
+  const blocked = await call(`A.login('boss@acme.ng','Strong#Pass1')`, 100);
+  check('correct password is blocked after five failed attempts', blocked.success === false && /Too many failed attempts/i.test(blocked.error || ''), blocked.error);
+  check('lockout message indicates a five-minute window', /4 minute|5 minute/i.test(blocked.error || ''), blocked.error);
+
+  const passed = results.filter(Boolean).length;
+  console.log('\\nTOTAL', passed + '/' + results.length, 'passed; console errors:', JSON.stringify(errs.slice(0, 3)));
+  db.close();
+  if (passed !== results.length || errs.length) process.exitCode = 1;
+  app.quit();
 });
