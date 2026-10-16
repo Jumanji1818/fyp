@@ -10,10 +10,15 @@ app.whenReady().then(async () => {
   protocol.handle('app', (req) => { const p = decodeURIComponent(new URL(req.url).pathname); return net.fetch(pathToFileURL(path.join(DIST, p === '/' ? 'index.html' : p)).toString()); });
   const win = new BrowserWindow({ width: 1366, height: 900, show: false, webPreferences: { preload: path.join(__dirname, '..', 'electron', 'preload.cjs'), contextIsolation: true } });
   const errs = []; win.webContents.on('console-message', (_e, l, m) => { if (l >= 2 && !/Security Warning/.test(m)) errs.push(m.slice(0, 200)); });
-  await win.loadURL('app://procura/index.html'); await sleep(4500);
-  const hookReady = await win.webContents.executeJavaScript('!!window.__app && typeof window.__app.login === "function"', true);
+  console.log('AUTH E2E: loading application');
+  await Promise.race([win.loadURL('app://procura/index.html'), new Promise((_, reject) => setTimeout(() => reject(new Error('Application load timed out')), 20000))]);
+  await sleep(4500);
+  console.log('AUTH E2E: application loaded');
+  const hookReady = await Promise.race([win.webContents.executeJavaScript('!!window.__app && typeof window.__app.login === "function"', true), new Promise((_, reject) => setTimeout(() => reject(new Error('E2E hook evaluation timed out')), 10000))]);
+  console.log('AUTH E2E: hook ready =', hookReady);
   if (!hookReady) { console.error('E2E hook missing. Build the test app with VITE_E2E=1.'); db.close(); app.quit(); process.exitCode = 2; return; }
   const run = (c) => Promise.race([win.webContents.executeJavaScript(c, true), new Promise((_, reject) => setTimeout(() => reject(new Error('Renderer evaluation timed out: ' + c.slice(0, 120))), 15000))]);
+  console.log('AUTH E2E: beginning checks');
   await run(`window.__click=(re)=>{const b=[...document.querySelectorAll('button,a')].find(x=>re.test((x.innerText||x.title||'').trim()));if(b){b.click();return true}return false};true`);
   await run(`__click(/Load Demo Data/i)`); await sleep(2000);
   const results = [];
