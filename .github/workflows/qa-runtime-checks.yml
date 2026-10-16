@@ -37,7 +37,7 @@ jobs:
           mkdir -p "$PROCURA_USERDATA"
           set -o pipefail
           xvfb-run -a timeout --kill-after=10s 120s npx electron --no-sandbox tools/auth-e2e.cjs 2>&1 | tee auth-e2e.log
-          grep -E '^TOTAL [0-9]+/[0-9]+ passed' auth-e2e.log
+          grep -E '^(\\n)?TOTAL [0-9]+/[0-9]+ passed' auth-e2e.log
       - name: Run business-rule regression tests (TC5, TC7, TC9, TC10, TC11)
         if: ${{ !cancelled() }}
         shell: bash
