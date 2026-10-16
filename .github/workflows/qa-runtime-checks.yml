@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: procura-runtime-qa
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -32,21 +36,21 @@ jobs:
         run: |
           mkdir -p "$PROCURA_USERDATA"
           set -o pipefail
-          timeout --kill-after=10s 120s xvfb-run -a npx electron --no-sandbox tools/auth-e2e.cjs 2>&1 | tee auth-e2e.log
+          xvfb-run -a timeout --kill-after=10s 120s npx electron --no-sandbox tools/auth-e2e.cjs 2>&1 | tee auth-e2e.log
           grep -E '^TOTAL [0-9]+/[0-9]+ passed' auth-e2e.log
       - name: Run business-rule regression tests (TC5, TC7, TC9, TC10, TC11)
         if: always()
         shell: bash
         run: |
           set -o pipefail
-          timeout --kill-after=10s 120s xvfb-run -a npx electron --no-sandbox tools/business-rules-e2e.cjs 2>&1 | tee business-rules-e2e.log
+          xvfb-run -a timeout --kill-after=10s 120s npx electron --no-sandbox tools/business-rules-e2e.cjs 2>&1 | tee business-rules-e2e.log
           grep -E '^BUSINESS RULES TOTAL [0-9]+/[0-9]+ passed' business-rules-e2e.log
       - name: Run award and authority approval workflow
         if: always()
         shell: bash
         run: |
           set -o pipefail
-          timeout --kill-after=10s 120s xvfb-run -a npx electron --no-sandbox tools/award-e2e.cjs 2>&1 | tee award-e2e.log
+          xvfb-run -a timeout --kill-after=10s 120s npx electron --no-sandbox tools/award-e2e.cjs 2>&1 | tee award-e2e.log
           grep -Fq 'click award: true' award-e2e.log
           grep -Fq 'Sent to the Approving Authority' award-e2e.log
           grep -Fq 'A reason is required when rejecting an award.' award-e2e.log
@@ -60,8 +64,8 @@ jobs:
           mkdir -p /tmp/procura-qa-userdata
           export PROCURA_USERDATA=/tmp/procura-qa-userdata
           export PROCURA_DB=/tmp/procura-qa.sqlite
-          timeout --kill-after=10s 120s xvfb-run -a npx electron --no-sandbox tools/persist-test.cjs run1 2>&1 | tee persist-run1.log
-          timeout --kill-after=10s 120s xvfb-run -a npx electron --no-sandbox tools/persist-test.cjs run2 2>&1 | tee persist-run2.log
+          xvfb-run -a timeout --kill-after=10s 120s npx electron --no-sandbox tools/persist-test.cjs run1 2>&1 | tee persist-run1.log
+          xvfb-run -a timeout --kill-after=10s 120s npx electron --no-sandbox tools/persist-test.cjs run2 2>&1 | tee persist-run2.log
           grep -q 'correct password logs in? true' persist-run2.log
           grep -q 'after 5 bad tries, correct password accepted? (should be false = locked) false' persist-run2.log
           grep -Eqi 'lock message: Too many failed attempts|lock message: locked' persist-run2.log
@@ -82,7 +86,7 @@ jobs:
         run: |
           set -o pipefail
           export PROCURA_TEST_PDF=/tmp/procura-qa-export.pdf
-          timeout --kill-after=10s 120s xvfb-run -a npx electron --no-sandbox tools/pdf-test.cjs 2>&1 | tee pdf-test.log
+          xvfb-run -a timeout --kill-after=10s 120s npx electron --no-sandbox tools/pdf-test.cjs 2>&1 | tee pdf-test.log
           grep -Fq 'pdf exists: true' pdf-test.log
           grep -Fq 'app visible after: true' pdf-test.log
           test -s "$PROCURA_TEST_PDF"
@@ -92,7 +96,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p /tmp/shots
-          timeout 300s xvfb-run -a npx electron --no-sandbox tools/audit-main.cjs 2>&1 | tee audit-main.log
+          xvfb-run -a timeout --kill-after=10s 300s npx electron --no-sandbox tools/audit-main.cjs 2>&1 | tee audit-main.log
           test -s /tmp/audit.json
       - name: Upload QA logs and screenshots
         if: always()
