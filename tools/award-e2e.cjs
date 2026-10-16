@@ -7,8 +7,8 @@ app.whenReady().then(async () => {
   protocol.handle('app', (req) => { const p = decodeURIComponent(new URL(req.url).pathname); return net.fetch(pathToFileURL(path.join(DIST, p === '/' ? 'index.html' : p)).toString()); });
   const win = new BrowserWindow({ width: 1366, height: 900, show: false, webPreferences: { preload: path.join(__dirname, '..', 'electron', 'preload.cjs'), contextIsolation: true } });
   const errs = []; win.webContents.on('console-message', (_e, l, m) => { if (l >= 2) errs.push(m.slice(0, 200)); });
-  await win.loadURL('app://procura/index.html'); await sleep(4500);
-  const run = (c) => win.webContents.executeJavaScript(c, true);
+  await Promise.race([win.loadURL('app://procura/index.html'), new Promise((_, reject) => setTimeout(() => reject(new Error('Application load timed out')), 20000))]); await sleep(4500);
+  const run = (c) => Promise.race([win.webContents.executeJavaScript(c, true), new Promise((_, reject) => setTimeout(() => reject(new Error('Renderer evaluation timed out: ' + c.slice(0, 100))), 15000))]);
   const shot = async (n) => fs.writeFileSync('/tmp/shots/e2e_' + n + '.png', (await win.webContents.capturePage()).toPNG());
   await run(`window.__click=(re)=>{const b=[...document.querySelectorAll('button,a')].find(x=>re.test((x.innerText||x.title||'').trim()));if(b){b.click();return true}return false};window.__fill=(el,v)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}))};window.__nav=(l)=>{__click(/^\\s*Menu\\s*$/i);return new Promise(r=>setTimeout(()=>{const b=[...document.querySelectorAll('aside nav button')].find(x=>(x.innerText||'').trim()===l);b&&b.click();r(!!b)},400))};window.__login=async(e)=>{__click(/log\\s?out/i);await new Promise(r=>setTimeout(r,800));__click(/^Already have an account|Sign in$/i);await new Promise(r=>setTimeout(r,500));__fill(document.querySelector('input[type=text],input[type=email]'),e);__fill(document.querySelector('input[type=password]'),'Procura@2026');document.querySelector('button[type=submit]').click();await new Promise(r=>setTimeout(r,1500));return true};true`);
   await run(`__click(/Load Demo Data/i)`); await sleep(1500);
@@ -36,4 +36,7 @@ app.whenReady().then(async () => {
   console.log('POs:', await run(`(document.querySelector('main').innerText.match(/PO-\\d{4}-\\d{4}/g)||[]).filter((v,i,a)=>a.indexOf(v)===i).join(', ')`));
   console.log('errs:', JSON.stringify(errs));
   app.quit();
+}).catch((err) => {
+  console.error('AWARD E2E FATAL:', err && err.stack ? err.stack : err);
+  process.exit(1);
 });
