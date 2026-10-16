@@ -1,0 +1,74 @@
+name: Procura QA Runtime Checks
+
+on:
+  push:
+    branches:
+      - "qa/run-project-checks-*"
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Linux display dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Install app dependencies
+        run: npm install --legacy-peer-deps
+      - name: Build app under test
+        run: npm run build:desktop
+      - name: Run authentication end-to-end checks (35 assertions)
+        shell: bash
+        run: |
+          mkdir -p /tmp/shots
+          set +e
+          xvfb-run -a npx electron tools/auth-e2e.cjs 2>&1 | tee auth-e2e.log
+          rc=${PIPESTATUS[0]}
+          if grep -q '^FAIL ' auth-e2e.log; then rc=1; fi
+          echo "auth_e2e_exit=$rc" >> "$GITHUB_ENV"
+          exit "$rc"
+      - name: Run award workflow checks
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/shots
+          xvfb-run -a npx electron tools/award-e2e.cjs 2>&1 | tee award-e2e.log
+      - name: Run persistence checks across separate app launches
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/shots /tmp/procura-qa-userdata
+          export PROCURA_USERDATA=/tmp/procura-qa-userdata
+          export PROCURA_DB=/tmp/procura-qa.sqlite
+          xvfb-run -a npx electron tools/persist-test.cjs run1 2>&1 | tee persist-run1.log
+          xvfb-run -a npx electron tools/persist-test.cjs run2 2>&1 | tee persist-run2.log
+      - name: Run PDF export checks
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/shots
+          export PROCURA_TEST_PDF=/tmp/procura-qa-export.pdf
+          xvfb-run -a npx electron tools/pdf-test.cjs 2>&1 | tee pdf-test.log
+          test -s "$PROCURA_TEST_PDF" && file "$PROCURA_TEST_PDF"
+      - name: Run role and screen audit
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/shots
+          xvfb-run -a npx electron tools/audit-main.cjs 2>&1 | tee audit-main.log
+      - name: Upload QA evidence logs and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: procura-qa-evidence
+          path: |
+            *.log
+            /tmp/audit.json
+            /tmp/shots/**
+          if-no-files-found: warn
