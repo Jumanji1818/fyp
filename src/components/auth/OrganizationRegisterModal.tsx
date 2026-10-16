@@ -366,7 +366,9 @@ export const OrganizationRegisterModal: React.FC<OrganizationRegisterModalProps>
                     onChange={(e) => setBudgetEstimate(Number(e.target.value))}
                     className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#07130E] border border-[#1F3A2D] text-[#F2EFE6] focus:border-[#D4AF37] outline-none font-mono"
                   />
-                  <DollarSign className="w-4 h-4 text-[#A8B5AB] absolute left-3 top-2.5" />
+                  <span className="absolute left-3 top-2 font-mono font-bold text-sm text-[#D4AF37]">
+                    {selectedCurrency.symbol}
+                  </span>
                 </div>
                 <span className="text-[11px] text-[#D4AF37] mt-1 block">
                   Formatted Cap: {selectedCurrency.symbol}{budgetEstimate.toLocaleString()}

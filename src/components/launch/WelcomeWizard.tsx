@@ -34,12 +34,26 @@ export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
   const { loadDemoData, updateSettings } = useApp();
   const [step, setStep] = useState<'welcome' | 1 | 2 | 3 | 'done'>('welcome');
 
+  const CURRENCIES = [
+    { code: 'NGN', symbol: '₦', label: 'Nigerian Naira (₦)' },
+    { code: 'USD', symbol: '$', label: 'US Dollar ($)' },
+    { code: 'GBP', symbol: '£', label: 'British Pound (£)' },
+    { code: 'EUR', symbol: '€', label: 'Euro (€)' },
+    { code: 'GHS', symbol: 'GH₵', label: 'Ghanaian Cedi (GH₵)' },
+    { code: 'KES', symbol: 'KSh', label: 'Kenyan Shilling (KSh)' },
+    { code: 'ZAR', symbol: 'R', label: 'South African Rand (R)' },
+    { code: 'CAD', symbol: 'C$', label: 'Canadian Dollar (C$)' },
+  ];
+
   // Step 1: Org details
   const [orgName, setOrgName] = useState('');
   const [orgType, setOrgType] = useState('company');
+  const [currency, setCurrency] = useState('NGN');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+
+  const selectedCurrency = CURRENCIES.find((c) => c.code === currency) || CURRENCIES[0];
 
   // Step 2: Departments
   const [departments, setDepartments] = useState<Array<{ name: string; budget: number }>>([
@@ -75,6 +89,7 @@ export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
       address,
       phone,
       email,
+      currency: selectedCurrency.symbol,
     });
     setStep('done');
     setTimeout(() => {
@@ -281,13 +296,18 @@ export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-[#A8B5AB] font-medium mb-1">Currency</label>
-                    <input
-                      type="text"
-                      value="Nigerian Naira (₦)"
-                      disabled
-                      className="w-full px-3 py-2 rounded-[10px] bg-[#132A20] border border-[#1F3A2D] text-[#D4AF37] font-semibold outline-none cursor-not-allowed"
-                    />
+                    <label className="block text-[#A8B5AB] font-medium mb-1">Operating Currency</label>
+                    <select
+                      value={currency}
+                      onChange={(e) => setCurrency(e.target.value)}
+                      className="w-full px-3 py-2 rounded-[10px] bg-[#0D1F17] border border-[#1F3A2D] focus:border-[#D4AF37] text-[#D4AF37] font-semibold outline-none"
+                    >
+                      {CURRENCIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -333,7 +353,9 @@ export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
 
               <div>
                 <h3 className="text-xl font-bold font-serif-heading text-[#F2EFE6]">Department Setup</h3>
-                <p className="text-xs text-[#A8B5AB]">Define departments and their initial annual spending budgets.</p>
+                <p className="text-xs text-[#A8B5AB]">
+                  Define departments and their initial annual spending budgets in {selectedCurrency.label}.
+                </p>
               </div>
 
               {/* Existing Departments list */}
@@ -345,7 +367,9 @@ export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
                   >
                     <div>
                       <div className="font-semibold text-[#F2EFE6]">{d.name}</div>
-                      <div className="text-[11px] text-[#D4AF37]">Budget: ₦{d.budget.toLocaleString()}</div>
+                      <div className="text-[11px] text-[#D4AF37]">
+                        Budget: {selectedCurrency.symbol}{d.budget.toLocaleString()}
+                      </div>
                     </div>
                     {departments.length > 1 && (
                       <button
@@ -374,7 +398,7 @@ export const WelcomeWizard: React.FC<WelcomeWizardProps> = ({
                     type="number"
                     value={newDeptBudget}
                     onChange={(e) => setNewDeptBudget(Number(e.target.value))}
-                    placeholder="Annual Budget (₦)"
+                    placeholder={`Annual Budget (${selectedCurrency.symbol})`}
                     className="w-full px-3 py-2 rounded-lg bg-[#0D1F17] border border-[#1F3A2D] text-[#F2EFE6] outline-none"
                   />
                   <button

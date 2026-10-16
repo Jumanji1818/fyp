@@ -15,6 +15,11 @@ import {
   Moon,
   Sun,
   Monitor,
+  Layers,
+  Plus,
+  Trash2,
+  Edit2,
+  AlertCircle,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ConfirmationDialog } from '../common/ConfirmationDialog';
@@ -26,6 +31,10 @@ export const SettingsModule: React.FC = () => {
     currentUser,
     currentOrganization,
     users,
+    departments,
+    addDepartment,
+    deleteDepartment,
+    updateDepartment,
     theme,
     setTheme,
     exportDatabaseJson,
@@ -45,6 +54,15 @@ export const SettingsModule: React.FC = () => {
   ];
 
   const isAdmin = currentUser?.role === 'Organization Admin';
+  const isOrgManager =
+    isAdmin ||
+    currentUser?.role === 'Finance Officer' ||
+    currentOrganization.type === 'sole_proprietorship';
+
+  const orgDepts = departments.filter((d) =>
+    d.organizationId ? d.organizationId === currentOrganization.id : currentOrganization.id === 'org-emerald'
+  );
+
   const [activeTab, setActiveTab] = useState<string>('profile');
 
   // Profile
@@ -66,6 +84,44 @@ export const SettingsModule: React.FC = () => {
   const [orgCurrency, setOrgCurrency] = useState(
     currentOrganization?.currency || settings.currency || '₦'
   );
+
+  // Department Management
+  const [newDeptName, setNewDeptName] = useState('');
+  const [newDeptBudget, setNewDeptBudget] = useState<number>(15000000);
+  const [editingDept, setEditingDept] = useState<{ id: string; name: string; budget: number } | null>(null);
+  const [deptToDelete, setDeptToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deptNotice, setDeptNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleAddDept = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDeptName.trim() || newDeptBudget < 0) return;
+    addDepartment(newDeptName.trim(), newDeptBudget, currentOrganization.id);
+    setNewDeptName('');
+    setNewDeptBudget(15000000);
+    setDeptNotice({ type: 'success', message: `Department "${newDeptName.trim()}" created successfully.` });
+    setTimeout(() => setDeptNotice(null), 4000);
+  };
+
+  const handleUpdateDept = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDept || !editingDept.name.trim()) return;
+    updateDepartment(editingDept.id, editingDept.name.trim(), editingDept.budget);
+    setEditingDept(null);
+    setDeptNotice({ type: 'success', message: 'Department updated successfully.' });
+    setTimeout(() => setDeptNotice(null), 4000);
+  };
+
+  const handleConfirmDeleteDept = () => {
+    if (!deptToDelete) return;
+    const result = deleteDepartment(deptToDelete.id);
+    if (!result.success) {
+      setDeptNotice({ type: 'error', message: result.message || 'Cannot delete department.' });
+    } else {
+      setDeptNotice({ type: 'success', message: `Department "${deptToDelete.name}" removed.` });
+    }
+    setDeptToDelete(null);
+    setTimeout(() => setDeptNotice(null), 5000);
+  };
 
   // Backup confirmation
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
@@ -152,9 +208,10 @@ export const SettingsModule: React.FC = () => {
           { id: 'appearance', label: 'Appearance', icon: Palette },
           { id: 'notifications', label: 'Notifications', icon: Bell },
           { id: 'security', label: 'Security', icon: Shield },
-          ...(isAdmin
+          ...(isAdmin || isOrgManager
             ? [
-                { id: 'organization', label: 'Organization', icon: Building },
+                { id: 'organization', label: 'Organization Info', icon: Building },
+                { id: 'departments', label: 'Departments & Units', icon: Layers },
                 { id: 'procurement_rules', label: 'Procurement Rules', icon: Sliders },
                 { id: 'backup', label: 'Backup & Restore', icon: Database },
               ]
@@ -483,6 +540,175 @@ export const SettingsModule: React.FC = () => {
           </form>
         )}
 
+        {/* DEPARTMENTS & UNITS MANAGEMENT TAB */}
+        {activeTab === 'departments' && isOrgManager && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-base font-bold font-serif-heading text-[#F2EFE6]">
+                Departments & Operational Units ({currentOrganization.name})
+              </h3>
+              <p className="text-[#A8B5AB] mt-0.5">
+                Add, manage, or remove departments and allocate annual baseline budget caps.
+              </p>
+            </div>
+
+            {/* Department Action Notice */}
+            {deptNotice && (
+              <div
+                className={`p-3.5 rounded-xl border text-xs flex items-center justify-between ${
+                  deptNotice.type === 'error'
+                    ? 'bg-[#D9534F]/15 border-[#D9534F]/40 text-[#D9534F]'
+                    : 'bg-[#3FB67A]/15 border-[#3FB67A]/40 text-[#3FB67A]'
+                }`}
+              >
+                <span>{deptNotice.message}</span>
+                <button onClick={() => setDeptNotice(null)} className="p-0.5 hover:opacity-75">
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Create New Department Form */}
+            <form onSubmit={handleAddDept} className="p-4 rounded-xl bg-[#132A20] border border-[#1F3A2D] space-y-3">
+              <span className="font-bold text-[#F2EFE6] block text-xs flex items-center gap-1.5">
+                <Plus className="w-4 h-4 text-[#D4AF37]" /> Create New Department
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[#A8B5AB] text-[11px] mb-1 font-medium">Department Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={newDeptName}
+                    onChange={(e) => setNewDeptName(e.target.value)}
+                    placeholder="e.g. Design Studio, Marketing, Quality Assurance"
+                    className="w-full px-3 py-2 rounded-lg bg-[#07130E] border border-[#1F3A2D] text-[#F2EFE6] outline-none focus:border-[#D4AF37]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[#A8B5AB] text-[11px] mb-1 font-medium">
+                    Annual Budget Allocation ({currentOrganization.currency || '₦'})
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    required
+                    value={newDeptBudget}
+                    onChange={(e) => setNewDeptBudget(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg bg-[#07130E] border border-[#1F3A2D] text-[#F2EFE6] font-mono outline-none focus:border-[#D4AF37]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] font-semibold text-xs flex items-center gap-1.5 hover:brightness-110 shadow"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[#D4AF37]" /> Add Department
+                </button>
+              </div>
+            </form>
+
+            {/* Existing Departments List */}
+            <div className="space-y-3">
+              <span className="font-bold text-[#F2EFE6] block text-xs">
+                Active Departments ({orgDepts.length})
+              </span>
+
+              {orgDepts.length === 0 ? (
+                <div className="py-8 text-center text-[#A8B5AB] bg-[#132A20]/40 rounded-xl border border-[#1F3A2D]">
+                  No departments created yet for {currentOrganization.name}. Use the form above to add your first department.
+                </div>
+              ) : (
+                orgDepts.map((d) => (
+                  <div
+                    key={d.id}
+                    className="p-3.5 rounded-xl bg-[#132A20] border border-[#1F3A2D] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div>
+                      <div className="font-semibold text-[#F2EFE6] text-xs flex items-center gap-2">
+                        <Building className="w-3.5 h-3.5 text-[#D4AF37]" />
+                        <span>{d.name}</span>
+                      </div>
+                      <div className="text-[11px] text-[#A8B5AB] mt-0.5">
+                        Annual Budget Cap: <strong className="text-[#D4AF37] font-mono">{currentOrganization.currency || '₦'}{d.annualBudget.toLocaleString()}</strong> · Spent: {currentOrganization.currency || '₦'}{d.spent.toLocaleString()} · Committed: {currentOrganization.currency || '₦'}{d.committed.toLocaleString()}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setEditingDept({ id: d.id, name: d.name, budget: d.annualBudget })}
+                        className="px-2.5 py-1.5 rounded-lg bg-[#07130E] hover:bg-[#1F3A2D] text-[#A8B5AB] hover:text-[#D4AF37] border border-[#1F3A2D] text-xs font-semibold flex items-center gap-1 transition-colors"
+                      >
+                        <Edit2 className="w-3 h-3" /> Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setDeptToDelete({ id: d.id, name: d.name })}
+                        className="px-2.5 py-1.5 rounded-lg bg-[#07130E] hover:bg-[#D9534F]/20 text-[#A8B5AB] hover:text-[#D9534F] border border-[#1F3A2D] text-xs font-semibold flex items-center gap-1 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" /> Remove
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Edit Department Sub-Modal */}
+            {editingDept && (
+              <div className="p-4 rounded-xl bg-[#07130E] border-2 border-[#D4AF37]/50 space-y-3 animate-in fade-in">
+                <span className="font-bold text-[#D4AF37] block text-xs">Edit Department Details</span>
+                <form onSubmit={handleUpdateDept} className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[#A8B5AB] text-[11px] mb-1">Department Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={editingDept.name}
+                        onChange={(e) => setEditingDept({ ...editingDept, name: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg bg-[#132A20] border border-[#1F3A2D] text-[#F2EFE6] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[#A8B5AB] text-[11px] mb-1">Annual Budget Cap ({currentOrganization.currency || '₦'})</label>
+                      <input
+                        type="number"
+                        min={0}
+                        required
+                        value={editingDept.budget}
+                        onChange={(e) => setEditingDept({ ...editingDept, budget: Number(e.target.value) })}
+                        className="w-full px-3 py-2 rounded-lg bg-[#132A20] border border-[#1F3A2D] text-[#F2EFE6] font-mono outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditingDept(null)}
+                      className="px-3 py-1.5 rounded-lg border border-[#1F3A2D] text-[#A8B5AB] text-xs"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-1.5 rounded-lg bg-[#1F6F4A] text-[#F2EFE6] font-semibold text-xs"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 6. PROCUREMENT RULES (Admin) (Section 8) */}
         {activeTab === 'procurement_rules' && isAdmin && (
           <form onSubmit={handleSaveProcurementRules} className="space-y-4">
@@ -617,6 +843,16 @@ export const SettingsModule: React.FC = () => {
         title="Restore Database from Backup?"
         consequence="All existing tenders, bids, orders, and audits will be overwritten with the imported backup archive."
         confirmLabel="Overwrite & Restore Database"
+      />
+
+      {/* DEPARTMENT DELETE CONFIRMATION DIALOG */}
+      <ConfirmationDialog
+        isOpen={!!deptToDelete}
+        onClose={() => setDeptToDelete(null)}
+        onConfirm={handleConfirmDeleteDept}
+        title={`Remove Department "${deptToDelete?.name}"?`}
+        consequence="The department will be permanently removed from your organization structure. Departments with active requisitions or open tenders cannot be removed."
+        confirmLabel="Remove Department"
       />
     </div>
   );

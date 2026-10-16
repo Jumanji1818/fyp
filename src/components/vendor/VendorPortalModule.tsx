@@ -116,7 +116,7 @@ export const VendorPortalModule: React.FC<VendorPortalModuleProps> = ({
         bidReference: matchedBid?.referenceNumber,
         deliveryDate: po.expectedDeliveryDate,
         warrantyPeriod: matchedBid?.warrantyPeriod || '12 Months OEM Warranty',
-        procurementOfficerName: tender?.createdByName || 'Tenders & Procurement Directorate',
+        procurementOfficerName: 'Tenders & Procurement Directorate',
       },
     });
   };

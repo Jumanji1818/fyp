@@ -121,6 +121,9 @@ interface AppContextType {
   overrideBudgetAndAward: (tenderId: string, winningBidId: string, overrideReason: string) => { requiresAuthority: boolean; poCreated?: PurchaseOrder; blocked?: string };
   acknowledgePO: (poId: string) => void;
   dispatchDelivery: (poId: string, notes: string) => void;
+  addDepartment: (name: string, annualBudget: number, organizationId?: string) => Department;
+  deleteDepartment: (departmentId: string) => { success: boolean; message?: string };
+  updateDepartment: (departmentId: string, name: string, annualBudget?: number) => void;
   receiveDelivery: (poId: string, itemsReceived: DeliveryRecord['itemsReceived']) => void;
   recordPayment: (paymentData: Omit<PaymentRecord, 'id' | 'voucherNumber' | 'recordedByUserId' | 'recordedByName'>) => PaymentRecord | null;
   toggleMyVendor: (vendorId: string) => void;
@@ -2002,6 +2005,59 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog('Adjusted Department Budget', dept.name, `₦${oldBudget.toLocaleString()}`, `₦${newBudget.toLocaleString()}`, reason);
   };
 
+  const addDepartment = (name: string, annualBudget: number, orgId?: string): Department => {
+    const targetOrgId = orgId || currentOrganization.id;
+    const newDept: Department = {
+      id: 'dept-' + Date.now(),
+      organizationId: targetOrgId,
+      name: name.trim(),
+      annualBudget: Math.max(0, annualBudget),
+      spent: 0,
+      committed: 0,
+    };
+
+    setDepartments((prev) => [...prev, newDept]);
+    addAuditLog('Created Department', newDept.name, '-', `Budget: ₦${newDept.annualBudget.toLocaleString()}`, `Created for ${currentOrganization.name}`);
+    return newDept;
+  };
+
+  const deleteDepartment = (deptId: string): { success: boolean; message?: string } => {
+    const dept = departments.find((d) => d.id === deptId);
+    if (!dept) return { success: false, message: 'Department not found' };
+
+    // Prevent deletion if active requisitions, open tenders, or POs are attached
+    const activeReqs = requests.filter((r) => r.departmentId === deptId && r.status !== 'Rejected' && r.status !== 'Converted to Tender');
+    const activeTenders = tenders.filter((t) => t.departmentId === deptId && t.status !== 'Cancelled' && t.status !== 'Awarded');
+    const activePOs = purchaseOrders.filter((po) => po.departmentId === deptId && po.status !== 'Closed' && po.status !== 'Cancelled');
+
+    if (activeReqs.length > 0 || activeTenders.length > 0 || activePOs.length > 0) {
+      return {
+        success: false,
+        message: `Cannot remove "${dept.name}": There are active requisitions (${activeReqs.length}), tenders (${activeTenders.length}), or purchase orders (${activePOs.length}) currently assigned to this department.`,
+      };
+    }
+
+    setDepartments((prev) => prev.filter((d) => d.id !== deptId));
+    addAuditLog('Deleted Department', dept.name, `Budget: ₦${dept.annualBudget.toLocaleString()}`, 'Removed', `Deleted by ${currentUser?.fullName || 'User'}`);
+    return { success: true };
+  };
+
+  const updateDepartment = (deptId: string, name: string, annualBudget?: number) => {
+    setDepartments((prev) =>
+      prev.map((d) => {
+        if (d.id === deptId) {
+          return {
+            ...d,
+            name: name.trim() || d.name,
+            annualBudget: annualBudget !== undefined ? Math.max(0, annualBudget) : d.annualBudget,
+          };
+        }
+        return d;
+      })
+    );
+    addAuditLog('Updated Department', name, '-', annualBudget !== undefined ? `₦${annualBudget.toLocaleString()}` : '-', `Updated by ${currentUser?.fullName || 'User'}`);
+  };
+
   // Admin User Management
   const adminApproveUser = (userId: string, role: UserRole, deptId?: string) => {
     setUsers((prev) =>
@@ -2212,6 +2268,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         overrideBudgetAndAward,
         acknowledgePO,
         dispatchDelivery,
+        addDepartment,
+        deleteDepartment,
+        updateDepartment,
         receiveDelivery,
         recordPayment,
         toggleMyVendor,

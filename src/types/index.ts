@@ -208,6 +208,7 @@ export interface Tender {
   status: TenderStatus;
   matchingVendorsNotifiedCount: number;
   createdAt: string;
+  estimatedBudget?: number;
   extendedDeadlineReason?: string;
   cancellationReason?: string;
   pendingAuthorityBidId?: string;

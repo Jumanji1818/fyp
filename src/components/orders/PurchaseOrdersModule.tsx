@@ -93,7 +93,7 @@ export const PurchaseOrdersModule: React.FC<PurchaseOrdersModuleProps> = ({ init
         bidReference: matchedBid?.referenceNumber,
         deliveryDate: po.expectedDeliveryDate,
         warrantyPeriod: matchedBid?.warrantyPeriod || '12 Months Comprehensive OEM Warranty',
-        procurementOfficerName: tender?.createdByName || 'Tenders & Procurement Directorate',
+        procurementOfficerName: 'Tenders & Procurement Directorate',
       },
     });
   };

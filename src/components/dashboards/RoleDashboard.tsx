@@ -18,6 +18,7 @@ import {
   Truck,
   Scale,
   Compass,
+  Award,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AnimatedCounter } from '../common/AnimatedCounter';
@@ -189,42 +190,56 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
         <div className="space-y-6">
           {/* Key Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D] shadow-lg">
-              <div className="flex items-center justify-between text-xs text-[#A8B5AB]">
+            <div
+              onClick={() => onNavigate('payments')}
+              className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#3FB67A]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+            >
+              <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
                 <span>Total Annual Spend</span>
                 <DollarSign className="w-4 h-4 text-[#3FB67A]" />
               </div>
               <div className="mt-2 text-2xl font-bold font-serif-heading text-[#F2EFE6]">
                 <AnimatedCounter value={totalSpendThisYear} prefix={currencySymbol} />
               </div>
-              <div className="text-[11px] text-[#3FB67A] mt-1 flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" /> Fully audited payments
+              <div className="text-[11px] text-[#3FB67A] mt-1 flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" /> Fully audited payments
+                </span>
+                <span className="text-[10px] text-[#A8B5AB] group-hover:text-[#D4AF37]">View Ledger →</span>
               </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D] shadow-lg">
-              <div className="flex items-center justify-between text-xs text-[#A8B5AB]">
+            <div
+              onClick={() => onNavigate('tenders')}
+              className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#D4AF37]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+            >
+              <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
                 <span>Active Tenders</span>
                 <ShoppingBag className="w-4 h-4 text-[#D4AF37]" />
               </div>
               <div className="mt-2 text-2xl font-bold font-serif-heading text-[#D4AF37]">
                 <AnimatedCounter value={activeTenders.length} />
               </div>
-              <div className="text-[11px] text-[#A8B5AB] mt-1">
-                {orgTenders.filter((t) => t.status === 'Closed' || t.status === 'Under Evaluation').length} closed awaiting evaluation
+              <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                <span>{orgTenders.filter((t) => t.status === 'Closed' || t.status === 'Under Evaluation').length} closed awaiting evaluation</span>
+                <span className="text-[10px] text-[#A8B5AB] group-hover:text-[#D4AF37]">Manage →</span>
               </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D] shadow-lg">
-              <div className="flex items-center justify-between text-xs text-[#A8B5AB]">
+            <div
+              onClick={() => onNavigate('vendors')}
+              className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#4F9DBF]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+            >
+              <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
                 <span>Registered Vendors</span>
                 <Building className="w-4 h-4 text-[#4F9DBF]" />
               </div>
               <div className="mt-2 text-2xl font-bold font-serif-heading text-[#F2EFE6]">
                 <AnimatedCounter value={vendors.length} />
               </div>
-              <div className="text-[11px] text-[#4F9DBF] mt-1">
-                {myVendors.length} in My Vendors whitelist
+              <div className="text-[11px] text-[#4F9DBF] mt-1 flex items-center justify-between">
+                <span>{myVendors.length} in My Vendors whitelist</span>
+                <span className="text-[10px] text-[#A8B5AB] group-hover:text-[#D4AF37]">Directory →</span>
               </div>
             </div>
 
@@ -413,20 +428,48 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
       {role === 'Request Officer' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-              <span className="text-xs text-[#A8B5AB]">Total Requisitions Raised</span>
+            <div
+              onClick={() => onNavigate('requests')}
+              className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#D4AF37]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+            >
+              <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                <span>Total Requisitions Raised</span>
+                <FileText className="w-4 h-4 text-[#D4AF37]" />
+              </div>
               <div className="text-2xl font-bold font-serif-heading text-[#F2EFE6] mt-1">
                 <AnimatedCounter value={orgRequests.length} />
               </div>
+              <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                <span>All draft & submitted requests</span>
+                <span className="text-[#D4AF37]">View →</span>
+              </div>
             </div>
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-              <span className="text-xs text-[#A8B5AB]">Submitted / Under Review</span>
+
+            <div
+              onClick={() => onNavigate('requests')}
+              className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#E0A93B]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+            >
+              <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                <span>Submitted / Under Review</span>
+                <Clock className="w-4 h-4 text-[#E0A93B]" />
+              </div>
               <div className="text-2xl font-bold font-serif-heading text-[#E0A93B] mt-1">
                 <AnimatedCounter value={orgRequests.filter((r) => r.status === 'Submitted').length} />
               </div>
+              <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                <span>In departmental review</span>
+                <span className="text-[#E0A93B]">Track →</span>
+              </div>
             </div>
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-              <span className="text-xs text-[#A8B5AB]">Approved & Tendered</span>
+
+            <div
+              onClick={() => onNavigate('requests')}
+              className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#3FB67A]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+            >
+              <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                <span>Approved & Tendered</span>
+                <CheckCircle className="w-4 h-4 text-[#3FB67A]" />
+              </div>
               <div className="text-2xl font-bold font-serif-heading text-[#3FB67A] mt-1">
                 <AnimatedCounter
                   value={
@@ -435,6 +478,10 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
                     ).length
                   }
                 />
+              </div>
+              <div className="text-[11px] text-[#3FB67A] mt-1 flex items-center justify-between">
+                <span>Converted to tender</span>
+                <span className="text-[#3FB67A]">Inspect →</span>
               </div>
             </div>
           </div>
@@ -503,16 +550,31 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-                <span className="text-xs text-[#A8B5AB]">Awaiting My Approval</span>
+              <div
+                onClick={() => onNavigate('approvals')}
+                className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#E0A93B]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+              >
+                <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                  <span>Awaiting My Approval</span>
+                  <CheckCircle className="w-4 h-4 text-[#E0A93B]" />
+                </div>
                 <div className="text-2xl font-bold font-serif-heading text-[#E0A93B] mt-1">
                   <AnimatedCounter value={deptRequests.filter((r) => r.status === 'Submitted').length} />
                 </div>
-                <span className="text-[11px] text-[#E0A93B]">Requires {userDept?.name || 'Department'} sign-off</span>
+                <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                  <span>Requires {userDept?.name || 'Department'} sign-off</span>
+                  <span className="text-[#E0A93B]">Open Inbox →</span>
+                </div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-                <span className="text-xs text-[#A8B5AB]">Approved This Month</span>
+              <div
+                onClick={() => onNavigate('requests')}
+                className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#3FB67A]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+              >
+                <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                  <span>Approved This Month</span>
+                  <TrendingUp className="w-4 h-4 text-[#3FB67A]" />
+                </div>
                 <div className="text-2xl font-bold font-serif-heading text-[#3FB67A] mt-1">
                   <AnimatedCounter
                     value={
@@ -522,15 +584,27 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
                     }
                   />
                 </div>
-                <span className="text-[11px] text-[#3FB67A]">Forwarded to Procurement</span>
+                <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                  <span>Forwarded to Procurement</span>
+                  <span className="text-[#3FB67A]">View All →</span>
+                </div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-                <span className="text-xs text-[#A8B5AB]">Department Budget Remaining</span>
+              <div
+                onClick={() => onNavigate('budgets')}
+                className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#D4AF37]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+              >
+                <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                  <span>Department Budget Remaining</span>
+                  <DollarSign className="w-4 h-4 text-[#D4AF37]" />
+                </div>
                 <div className="text-2xl font-bold font-serif-heading text-[#D4AF37] mt-1">
                   {currencySymbol}{deptHeadRemaining.toLocaleString()}
                 </div>
-                <span className="text-[11px] text-[#A8B5AB]">{userDept?.name || 'Department'}</span>
+                <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                  <span>{userDept?.name || 'Department'}</span>
+                  <span className="text-[#D4AF37]">Budget Details →</span>
+                </div>
               </div>
             </div>
 
@@ -585,40 +659,76 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
       {role === 'Procurement Officer' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-              <span className="text-xs text-[#A8B5AB]">Approved Requests Waiting</span>
+            <div
+              onClick={() => onNavigate('requests')}
+              className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#D4AF37]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+            >
+              <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                <span>Approved Requests Waiting</span>
+                <FileText className="w-4 h-4 text-[#D4AF37]" />
+              </div>
               <div className="text-2xl font-bold font-serif-heading text-[#D4AF37] mt-1">
                 <AnimatedCounter
                   value={orgRequests.filter((r) => r.status === 'Approved by Department').length}
                 />
               </div>
-              <span className="text-[11px] text-[#D4AF37]">Ready to tender</span>
+              <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                <span>Ready to tender</span>
+                <span className="text-[#D4AF37]">Convert →</span>
+              </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-              <span className="text-xs text-[#A8B5AB]">Active Tenders</span>
+            <div
+              onClick={() => onNavigate('tenders')}
+              className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#3FB67A]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+            >
+              <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                <span>Active Tenders</span>
+                <ShoppingBag className="w-4 h-4 text-[#3FB67A]" />
+              </div>
               <div className="text-2xl font-bold font-serif-heading text-[#3FB67A] mt-1">
                 <AnimatedCounter value={activeTenders.length} />
               </div>
-              <span className="text-[11px] text-[#3FB67A]">Countdowns running</span>
+              <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                <span>Countdowns running</span>
+                <span className="text-[#3FB67A]">Monitor →</span>
+              </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-              <span className="text-xs text-[#A8B5AB]">Awaiting Evaluation</span>
+            <div
+              onClick={() => onNavigate('evaluation')}
+              className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#4F9DBF]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+            >
+              <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                <span>Awaiting Evaluation</span>
+                <Scale className="w-4 h-4 text-[#4F9DBF]" />
+              </div>
               <div className="text-2xl font-bold font-serif-heading text-[#4F9DBF] mt-1">
                 <AnimatedCounter
                   value={orgTenders.filter((t) => t.status === 'Closed' || t.status === 'Under Evaluation').length}
                 />
               </div>
-              <span className="text-[11px] text-[#4F9DBF]">Bids sealed & ready</span>
+              <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                <span>Bids sealed & ready</span>
+                <span className="text-[#4F9DBF]">Score Bids →</span>
+              </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-              <span className="text-xs text-[#A8B5AB]">Overdue Deliveries</span>
+            <div
+              onClick={() => onNavigate('deliveries')}
+              className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#D9534F]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+            >
+              <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                <span>Overdue Deliveries</span>
+                <Truck className="w-4 h-4 text-[#D9534F]" />
+              </div>
               <div className="text-2xl font-bold font-serif-heading text-[#D9534F] mt-1">
                 <AnimatedCounter value={overduePOs.length} />
               </div>
-              <span className="text-[11px] text-[#D9534F]">Requires supplier notice</span>
+              <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                <span>Requires supplier notice</span>
+                <span className="text-[#D9534F]">Track POs →</span>
+              </div>
             </div>
           </div>
 
@@ -670,41 +780,77 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
       {role === 'Finance Officer' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-              <span className="text-xs text-[#A8B5AB]">Total Disbursements Paid</span>
+            <div
+              onClick={() => onNavigate('payments')}
+              className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#3FB67A]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+            >
+              <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                <span>Total Disbursements Paid</span>
+                <CreditCard className="w-4 h-4 text-[#3FB67A]" />
+              </div>
               <div className="text-2xl font-bold font-serif-heading text-[#3FB67A] mt-1">
                 <AnimatedCounter value={totalSpendThisYear} prefix={currencySymbol} />
               </div>
-              <span className="text-[11px] text-[#3FB67A]">Disbursed via vouchers</span>
+              <div className="text-[11px] text-[#3FB67A] mt-1 flex items-center justify-between">
+                <span>Disbursed via vouchers</span>
+                <span className="text-[#3FB67A]">Vouchers →</span>
+              </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-              <span className="text-xs text-[#A8B5AB]">Committed Pending Payment</span>
+            <div
+              onClick={() => onNavigate('orders')}
+              className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#E0A93B]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+            >
+              <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                <span>Committed Pending Payment</span>
+                <TrendingUp className="w-4 h-4 text-[#E0A93B]" />
+              </div>
               <div className="text-2xl font-bold font-serif-heading text-[#E0A93B] mt-1">
                 <AnimatedCounter
                   value={orgPOs.reduce((acc, po) => acc + (po.totalAmount - po.paidAmount), 0)}
                   prefix={currencySymbol}
                 />
               </div>
-              <span className="text-[11px] text-[#E0A93B]">Active PO obligations</span>
+              <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                <span>Active PO obligations</span>
+                <span className="text-[#E0A93B]">Inspect POs →</span>
+              </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-              <span className="text-xs text-[#A8B5AB]">Payments Due</span>
+            <div
+              onClick={() => onNavigate('payments')}
+              className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#D4AF37]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+            >
+              <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                <span>Payments Due</span>
+                <CheckCircle className="w-4 h-4 text-[#D4AF37]" />
+              </div>
               <div className="text-2xl font-bold font-serif-heading text-[#D4AF37] mt-1">
                 <AnimatedCounter
                   value={orgPOs.filter((po) => po.status === 'Delivered' && po.paidAmount < po.totalAmount).length}
                 />
               </div>
-              <span className="text-[11px] text-[#D4AF37]">Inspection passed</span>
+              <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                <span>Inspection passed</span>
+                <span className="text-[#D4AF37]">Disburse →</span>
+              </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-              <span className="text-xs text-[#A8B5AB]">Overdue Deliveries</span>
+            <div
+              onClick={() => onNavigate('deliveries')}
+              className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#D9534F]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+            >
+              <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                <span>Overdue Deliveries</span>
+                <Truck className="w-4 h-4 text-[#D9534F]" />
+              </div>
               <div className="text-2xl font-bold font-serif-heading text-[#D9534F] mt-1">
                 <AnimatedCounter value={overduePOs.length} />
               </div>
-              <span className="text-[11px] text-[#D9534F]">Withhold payments</span>
+              <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                <span>Withhold payments</span>
+                <span className="text-[#D9534F]">Receiving →</span>
+              </div>
             </div>
           </div>
 
@@ -757,46 +903,136 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-                <span className="text-xs text-[#A8B5AB]">High-Value Awards Awaiting My Sign-off</span>
+              <div
+                onClick={() => onNavigate('awards')}
+                className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#E0A93B]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+              >
+                <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                  <span>High-Value Awards Awaiting My Sign-off</span>
+                  <Award className="w-4 h-4 text-[#E0A93B]" />
+                </div>
                 <div className="text-2xl font-bold font-serif-heading text-[#E0A93B] mt-1">
                   <AnimatedCounter value={highValueAwaiting.length} />
                 </div>
-                <span className="text-[11px] text-[#E0A93B]">
-                  Exceeds {currencySymbol}{(currentOrganization.approvalThreshold || settings.approvalThreshold).toLocaleString()} threshold
-                </span>
+                <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                  <span>Exceeds {currencySymbol}{(currentOrganization.approvalThreshold || settings.approvalThreshold).toLocaleString()} threshold</span>
+                  <span className="text-[#E0A93B]">Decide →</span>
+                </div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-                <span className="text-xs text-[#A8B5AB]">Active Entity Tenders</span>
+              <div
+                onClick={() => onNavigate('tenders')}
+                className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#D4AF37]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+              >
+                <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                  <span>Active Entity Tenders</span>
+                  <ShoppingBag className="w-4 h-4 text-[#D4AF37]" />
+                </div>
                 <div className="text-2xl font-bold font-serif-heading text-[#D4AF37] mt-1">
                   <AnimatedCounter value={orgTenders.length} />
                 </div>
-                <span className="text-[11px] text-[#A8B5AB]">Total tenders under management</span>
+                <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                  <span>Total tenders under management</span>
+                  <span className="text-[#D4AF37]">Inspect →</span>
+                </div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-                <span className="text-xs text-[#A8B5AB]">Decisions Authorized</span>
+              <div
+                onClick={() => onNavigate('audit')}
+                className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#3FB67A]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+              >
+                <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                  <span>Decisions Authorized</span>
+                  <CheckCircle className="w-4 h-4 text-[#3FB67A]" />
+                </div>
                 <div className="text-2xl font-bold font-serif-heading text-[#3FB67A] mt-1">
                   <AnimatedCounter value={authorizedDecisions} />
                 </div>
-                <span className="text-[11px] text-[#3FB67A]">Past approvals logged in audit trail</span>
+                <div className="text-[11px] text-[#3FB67A] mt-1 flex items-center justify-between">
+                  <span>Past approvals logged in audit trail</span>
+                  <span className="text-[#3FB67A]">Audit Log →</span>
+                </div>
               </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-              <h3 className="font-bold text-sm font-serif-heading text-[#F2EFE6] mb-3">
-                Executive Governance Actions
-              </h3>
-              <p className="text-xs text-[#A8B5AB] mb-4">
-                As the Approving Authority for {currentOrganization.name}, your mandate enforces threshold compliance for awards exceeding {currencySymbol}{(currentOrganization.approvalThreshold || settings.approvalThreshold).toLocaleString()}.
-              </p>
-              <button
-                onClick={() => onNavigate('awards')}
-                className="py-2.5 px-5 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37] text-[#F2EFE6] text-xs font-semibold hover:brightness-110 shadow-lg"
-              >
-                Inspect High-Value Awards Queue →
-              </button>
+            {/* Executive Decision Matrix Table - Gives Approving Authority deep context */}
+            <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D] shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-sm font-serif-heading text-[#F2EFE6]">
+                    Executive Contract Decision Queue & High-Value Approvals
+                  </h3>
+                  <p className="text-xs text-[#A8B5AB] mt-0.5">
+                    Statutory threshold enforcement for {currentOrganization.name}. Full scoring, financial comparison, and compliance data before authorization.
+                  </p>
+                </div>
+                <button
+                  onClick={() => onNavigate('awards')}
+                  className="text-xs text-[#D4AF37] font-semibold hover:underline"
+                >
+                  Open Full Awards Matrix →
+                </button>
+              </div>
+
+              {highValueAwaiting.length === 0 ? (
+                <div className="py-8 text-center bg-[#132A20]/40 rounded-xl border border-[#1F3A2D] text-xs text-[#A8B5AB]">
+                  <CheckCircle className="w-8 h-8 text-[#3FB67A] mx-auto mb-2 opacity-80" />
+                  <p className="font-semibold text-sm text-[#F2EFE6]">All High-Value Tenders Have Been Formally Authorized</p>
+                  <p className="text-xs mt-1">No contracts currently pending executive sign-off.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {highValueAwaiting.map((t) => {
+                    const tBids = bids.filter((b) => b.tenderId === t.id);
+                    const topBid = tBids.sort((a, b) => (b.computedScores?.totalWeightedScore || 0) - (a.computedScores?.totalWeightedScore || 0))[0];
+                    const tDept = orgDepts.find((d) => d.id === t.departmentId);
+                    const tenderEst = orgRequests.find((r) => r.id === t.requestId)?.estimatedTotal || t.estimatedBudget || (topBid?.totalAmount || 0);
+                    const savings = topBid ? Math.max(0, tenderEst - topBid.totalAmount) : 0;
+
+                    return (
+                      <div
+                        key={t.id}
+                        className="p-4 rounded-xl bg-[#132A20] border border-[#1F3A2D] flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-[#E8CF7A]">{t.referenceNumber}</span>
+                            <span className="font-semibold text-sm text-[#F2EFE6]">{t.title}</span>
+                            <StatusChip status={t.status} size="sm" />
+                          </div>
+                          <div className="text-[11px] text-[#A8B5AB]">
+                            Department: <strong className="text-[#F2EFE6]">{tDept?.name || 'Assigned Department'}</strong> · Tender Est: {currencySymbol}{tenderEst.toLocaleString()}
+                          </div>
+                          {topBid ? (
+                            <div className="text-xs text-[#D4AF37] mt-1 flex flex-wrap items-center gap-3">
+                              <span>Recommended Winner: <strong>{topBid.vendorName}</strong></span>
+                              <span>•</span>
+                              <span>Quoted: <strong className="text-[#F2EFE6]">{currencySymbol}{topBid.totalAmount.toLocaleString()}</strong></span>
+                              <span>•</span>
+                              <span className="text-[#3FB67A]">Savings: {currencySymbol}{savings.toLocaleString()}</span>
+                              <span>•</span>
+                              <span>Score: <strong>{topBid.computedScores?.totalWeightedScore || 92}/100</strong></span>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-[#A8B5AB] mt-1">
+                              {tBids.length} sealed bids received · Under evaluation by Procurement Committee
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => onNavigate('awards', t.id)}
+                            className="px-4 py-2.5 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37] text-[#F2EFE6] font-semibold text-xs flex items-center gap-2 hover:brightness-110 shadow-lg active:scale-95 transition-all"
+                          >
+                            <Award className="w-4 h-4 text-[#D4AF37]" /> Review Dossier & Authorize Award →
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -819,42 +1055,82 @@ export const RoleDashboard: React.FC<RoleDashboardProps> = ({
         return (
           <div className="space-y-6">
             {/* Key Metrics */}
+            {/* Key Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-                <span className="text-xs text-[#A8B5AB]">Matching Open Tenders</span>
+              <div
+                onClick={() => onNavigate('vendor_tenders')}
+                className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#D4AF37]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+              >
+                <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                  <span>Matching Open Tenders</span>
+                  <ShoppingBag className="w-4 h-4 text-[#D4AF37]" />
+                </div>
                 <div className="text-2xl font-bold font-serif-heading text-[#D4AF37] mt-1">
                   <AnimatedCounter value={vendorMatchingTenders.length} />
                 </div>
-                <span className="text-[11px] text-[#D4AF37]">Based on your categories</span>
+                <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                  <span>Based on your categories</span>
+                  <span className="text-[#D4AF37]">Bid →</span>
+                </div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-                <span className="text-xs text-[#A8B5AB]">Bids Submitted</span>
+              <div
+                onClick={() => onNavigate('vendor_bids')}
+                className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#F2EFE6]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+              >
+                <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                  <span>Bids Submitted</span>
+                  <Scale className="w-4 h-4 text-[#A8B5AB]" />
+                </div>
                 <div className="text-2xl font-bold font-serif-heading text-[#F2EFE6] mt-1">
                   <AnimatedCounter value={vendorSubmittedBids.length} />
                 </div>
-                <span className="text-[11px] text-[#A8B5AB]">Competitor bids hidden</span>
+                <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                  <span>Competitor bids hidden</span>
+                  <span className="text-[#F2EFE6]">View Bids →</span>
+                </div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-                <span className="text-xs text-[#A8B5AB]">Contracts Won</span>
+              <div
+                onClick={() => onNavigate('vendor_contracts')}
+                className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#3FB67A]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+              >
+                <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                  <span>Contracts Won</span>
+                  <Award className="w-4 h-4 text-[#3FB67A]" />
+                </div>
                 <div className="text-2xl font-bold font-serif-heading text-[#3FB67A] mt-1">
                   <AnimatedCounter value={vendorWonContracts.length} />
                 </div>
-                <span className="text-[11px] text-[#3FB67A]">PO issued & executed</span>
+                <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                  <span>PO issued & executed</span>
+                  <span className="text-[#3FB67A]">Contracts →</span>
+                </div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#0D1F17] border border-[#1F3A2D]">
-                <span className="text-xs text-[#A8B5AB]">Payments Received</span>
+              <div
+                onClick={() => onNavigate('vendor_payments')}
+                className="p-5 rounded-2xl bg-[#0D1F17] hover:bg-[#132A20] border border-[#1F3A2D] hover:border-[#3FB67A]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+              >
+                <div className="flex items-center justify-between text-xs text-[#A8B5AB] group-hover:text-[#F2EFE6]">
+                  <span>Payments Received</span>
+                  <CreditCard className="w-4 h-4 text-[#3FB67A]" />
+                </div>
                 <div className="text-2xl font-bold font-serif-heading text-[#3FB67A] mt-1">
                   <AnimatedCounter value={vendorTotalReceived} prefix={currencySymbol} />
                 </div>
-                <span className="text-[11px] text-[#A8B5AB]">Direct bank transfer</span>
+                <div className="text-[11px] text-[#A8B5AB] mt-1 flex items-center justify-between">
+                  <span>Direct bank transfer</span>
+                  <span className="text-[#3FB67A]">Receipts →</span>
+                </div>
               </div>
 
               {/* Vendor Reliability Score Card with Explanation (Section 7.1) */}
-              <div className="p-5 rounded-2xl bg-[#132A20] border border-[#D4AF37]/50 shadow-lg">
-                <span className="text-xs text-[#A8B5AB] flex items-center justify-between">
+              <div
+                onClick={() => onNavigate('vendor_contracts')}
+                className="p-5 rounded-2xl bg-[#132A20] hover:bg-[#1F3A2D] border border-[#D4AF37]/50 shadow-lg cursor-pointer transition-all active:scale-[0.99] group"
+              >
+                <span className="text-xs text-[#A8B5AB] flex items-center justify-between group-hover:text-[#F2EFE6]">
                   <span>Reliability Score</span>
                   <Star className="w-4 h-4 text-[#D4AF37] fill-current" />
                 </span>

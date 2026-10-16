@@ -14,6 +14,7 @@ import {
   XCircle,
   RefreshCw,
   Eye,
+  Award,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { StatusChip } from '../common/StatusChip';
@@ -557,6 +558,18 @@ export const TendersModule: React.FC<TendersModuleProps> = ({
                   Cancel Tender
                 </button>
               </div>
+
+              {selectedTender.status === 'Awarded' && onNavigateToEvaluation && (
+                <button
+                  onClick={() => {
+                    onNavigateToEvaluation(selectedTender.id);
+                    setSelectedTender(null);
+                  }}
+                  className="px-5 py-2.5 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37] text-[#F2EFE6] font-semibold flex items-center gap-2 hover:brightness-110 shadow-lg"
+                >
+                  <Award className="w-4 h-4 text-[#D4AF37]" /> View Evaluation & Award Decision →
+                </button>
+              )}
 
               {(selectedTender.status === 'Closed' || selectedTender.status === 'Under Evaluation') && onNavigateToEvaluation && (
                 <button

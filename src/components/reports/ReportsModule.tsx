@@ -358,7 +358,7 @@ export const ReportsModule: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1F3A2D]">
-                  {deliveries.map((del) => (
+                  {orgDeliveries.map((del) => (
                     <tr key={del.id}>
                       <td className="py-2.5 px-3 font-mono font-bold text-[#E8CF7A]">{del.poReference}</td>
                       <td className="py-2.5 px-3 text-[#F2EFE6]">{del.vendorName}</td>

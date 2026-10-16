@@ -23,6 +23,7 @@ export const PaymentsModule: React.FC = () => {
     recordPayment,
     celebrationOpen,
     setCelebrationOpen,
+    currentUser,
     currentOrganization,
   } = useApp();
 
@@ -50,9 +51,14 @@ export const PaymentsModule: React.FC = () => {
     return orgPOs.some((po) => po.id === p.purchaseOrderId || po.referenceNumber === p.poReference);
   });
 
+  const isSole = currentOrganization.type === 'sole_proprietorship';
+  const isFinanceOfficer = currentUser?.role === 'Finance Officer';
+  const canDisbursePayment = isFinanceOfficer || (isSole && currentUser?.role === 'Organization Admin');
+
   const maxPayable = selectedPO ? selectedPO.totalAmount - selectedPO.paidAmount : 0;
 
   const handleOpenRecord = (po?: PurchaseOrder) => {
+    if (!canDisbursePayment) return;
     const target = po || payablePOs[0];
     if (target) {
       setSelectedPOId(target.id);
@@ -142,13 +148,20 @@ export const PaymentsModule: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => handleOpenRecord()}
-            disabled={payablePOs.length === 0}
-            className="py-2.5 px-4 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] text-xs font-semibold flex items-center gap-1.5 hover:brightness-110 shadow-lg disabled:opacity-40"
-          >
-            <Plus className="w-4 h-4 text-[#D4AF37]" /> Record Payment Voucher
-          </button>
+          {canDisbursePayment ? (
+            <button
+              onClick={() => handleOpenRecord()}
+              disabled={payablePOs.length === 0}
+              className="py-2.5 px-4 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] text-xs font-semibold flex items-center gap-1.5 hover:brightness-110 shadow-lg disabled:opacity-40"
+            >
+              <Plus className="w-4 h-4 text-[#D4AF37]" /> Record Payment Voucher
+            </button>
+          ) : (
+            <div className="px-3.5 py-2 rounded-xl bg-[#132A20] border border-[#1F3A2D] text-[11px] text-[#A8B5AB] flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#E0A93B]" />
+              <span>Administrative Audit Mode (Disbursement restricted to Finance Officer)</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -187,12 +200,18 @@ export const PaymentsModule: React.FC = () => {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleOpenRecord(po)}
-                    className="px-4 py-2 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] font-semibold text-xs flex items-center gap-1.5 hover:brightness-110 shadow shrink-0"
-                  >
-                    <CreditCard className="w-3.5 h-3.5 text-[#D4AF37]" /> Pay Balance
-                  </button>
+                  {canDisbursePayment ? (
+                    <button
+                      onClick={() => handleOpenRecord(po)}
+                      className="px-4 py-2 rounded-[10px] bg-gradient-to-r from-[#1F6F4A] to-[#0F3D2A] border border-[#D4AF37]/50 text-[#F2EFE6] font-semibold text-xs flex items-center gap-1.5 hover:brightness-110 shadow shrink-0"
+                    >
+                      <CreditCard className="w-3.5 h-3.5 text-[#D4AF37]" /> Pay Balance
+                    </button>
+                  ) : (
+                    <span className="text-[11px] text-[#A8B5AB] italic shrink-0 px-3 py-1.5 rounded-lg bg-[#132A20] border border-[#1F3A2D]">
+                      Finance Officer Authorization Required
+                    </span>
+                  )}
                 </div>
               );
             })
